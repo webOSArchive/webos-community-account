@@ -1,0 +1,11 @@
+{
+	"icon": "../../images/icon.png",
+	"id": "com.palm.app.webosaccount",
+	"main": "../../index.html",
+	"title": "webOS Account",
+	"type": "web",
+	"uiRevision": 2,
+	"vendor": "webOS Archive",
+	"version": "1.0.0",
+	"visible": true
+}

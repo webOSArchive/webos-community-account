@@ -1,0 +1,39 @@
+--- a/com.palm.service.palmprofile/handlers/LoginProfileCommandAssistant.js	2026-08-01 14:28:39
++++ b/com.palm.service.palmprofile/handlers/LoginProfileCommandAssistant.js	2026-08-01 14:28:56
+@@ -7,17 +7,11 @@
+ 			PalmProfileUtil.sendError (future, "INVALID_REQUEST", "One or more request params are missing");
+ 			return;
+ 		}
+-		
+-		//calling isEmailAvailable will update the LCN endpoints
+-		ServiceLog.log("---------- checkingLCN ---------");
+-		var accountFuture = PalmCall.call("palm://com.palm.accountservices/", "isEmailAvailable", {email: this.args.email});  
+-		accountFuture.then(this, function() { 
+-            if(accountFuture.exception) {
+-				this.checkLCNRetry (future);
+-            } else {
+-				this.getDeviceProfile (future);
+-			}
+-		});
++
++		// webOS Archive: the old isEmailAvailable/LCN precheck talked to the dead
++		// lcn.palmws.com to discover server endpoints. Our backend needs no such
++		// discovery (getServerUrl is hardcoded), so skip it and authenticate directly.
++		this.getDeviceProfile (future);
+ 	},
+ 	
+ 	validateRequest: function () {
+@@ -99,7 +93,12 @@
+ 				
+ 				if(result.AuthenticateInfoEx) {
+ 					ServiceLog.log("---------- profileFuture result ---------"+JSON.stringify(result.AuthenticateInfoEx));
+-					PalmProfileUtil.saveAccountToken (result.AuthenticateInfoEx, future, "ACCOUNT_CREATION_ERROR");
++					// webOS Archive: like createNovaAccount, create the local db8 profile
++					// so the signed-in account becomes the device account (deviceinfo),
++					// then save the token. Name it from displayName (falls back to alias).
++					var username = result.AuthenticateInfoEx.displayName || result.AuthenticateInfoEx.accountAlias;
++					var saveAccountTokenCallback = PalmProfileUtil.saveAccountToken.bind(PalmProfileUtil, result.AuthenticateInfoEx, future, "LOGIN_ERROR");
++					PalmProfileUtil.createLocalAccount(username, saveAccountTokenCallback);
+ 					return;
+ 				}
+ 							

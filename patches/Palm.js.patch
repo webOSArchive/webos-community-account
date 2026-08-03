@@ -1,0 +1,124 @@
+--- a/com.palm.app.firstuse/source/tnc/Palm.js
++++ b/com.palm.app.firstuse/source/tnc/Palm.js
+@@ -1,13 +1,16 @@
+-label_dialog_palmTnc = rb.$L("HP Terms & Conditions");
++label_dialog_palmTnc = rb.$L("Terms of Service");
+ label_popup_palm_header = rb.$L("Do you accept?");
+-label_popup_palm_body = rb.$L("In order to use this device, you must accept the Terms. If you choose not to accept the Terms, you may return this device within the return period of the HP authorized distributor where you purchased this device for a refund subject to the applicable return policy.");
++label_popup_palm_body = rb.$L("To set up a webOS Account, you must accept the Terms. If you choose not to accept, you can close this app and keep using your device without an account.");
+ 
+ label_button_accept = rb.$L("Accept");
+ label_button_decline = rb.$L("Decline");
+ label_button_continue = rb.$L("Continue");
+ 
+-label_popup_palm_error_header = rb.$L("Server Error");
+-label_popup_palm_error_body = rb.$L("Please visit http://hpwebos.com/support to help resolve this problem");
++// webOS Archive: this popup doubles as the HTTPS-readiness gate. The account flow
++// requires the community update's modern TLS (the service reaches our origin via
++// the OTA's /usr/bin/curl); without it, the very first secure fetch (terms) fails.
++label_popup_palm_error_header = rb.$L("Update required");
++label_popup_palm_error_body = rb.$L("This app couldn't connect securely to the App Museum. It needs the latest webOS Community update, which enables secure connections. Please make sure you're online and updated, then reopen this app.");
+ label_popup_palm_error_button = rb.$L("Close");
+ 
+ 
+@@ -46,7 +49,7 @@
+ 					{name: "palmCheckBox", kind: enyo.CheckBox, checked: false},
+ 						{content: rb.$L("I accept the terms and conditions"), style:"margin:0 0 0 10px"}
+ 					]},
+-				{kind: enyo.Button, className: "enyo-button-affirmative", onclick: "continueButton", caption: label_button_continue}
++				{name: "continueBtn", kind: enyo.Button, className: "enyo-button-affirmative", onclick: "continueButton", caption: label_button_continue, disabled: true}
+ 			]}
+ 		]},
+ 				
+@@ -130,11 +133,14 @@
+     		console.info("Already did the deed...2");
+ 		} else {
+ 	  	    this.getTermsResponseCalled = false;
+-		   
++
+ 	   	    this.$.scrim.show();
+ 	    	this.$.spinner.setShowing(true);
+-	    	console.info("Getting server URL...");
+-	    	this.$.getServerURL.call();
++	    	// webOS Archive: skip the dead LCN location-server lookup
++	    	// (getURLForTerms retries forever against lcn.palmws.com) and
++	    	// fetch the terms straight from our backend.
++	    	console.info("WOSA: skipping getURLForTerms — fetching terms from catalog backend.");
++	    	this.getTerms();
+ 		}
+     },
+     
+@@ -170,7 +176,10 @@
+     },
+     
+ 	getTerms: function(inSender, inResponse){
+-     	var url = "https://" + inResponse.locationHost + "/palmcsext/services/deviceJ/";
++		// webOS Archive: terms come from our catalog backend — same base the
++		// patched palmprofile service uses. HTTPS: the service routes this POST
++		// through the OTA's modern /usr/bin/curl (see PalmProfileUtil.curlPost).
++		var url = "https://appcatalog.webosarchive.org/WebService/device.php?m=";
+     	enyo.application.FirstUse.setServerURL(url);
+ 		var lang = enyo.g11n.currentLocale().getLanguage();
+ 		console.info("Getting terms from: " + url);
+@@ -182,24 +191,35 @@
+ 		this.getTermsResponseCalled = true;
+ 
+ 		if(inResponse.returnValue) {
+-			this.$.palmErrorPopup.close(); 
+-			
++			this.$.palmErrorPopup.close();
++
+ 			this.$.palm.setContent(inResponse.GetTermsAndConditions.PALM);
+ 			enyo.application.FirstUse.setGoogleTerms(inResponse.GetTermsAndConditions.GOOGLE);
+ 			this.termsAreSet = true;
++			// webOS Archive: secure fetch succeeded -> device is https-ready; allow proceeding.
++			this.$.continueBtn.setDisabled(false);
+ 		}
+ 		else {
++			// webOS Archive: the first secure fetch failed -> not https-ready (or offline).
++			// Keep Continue disabled so the flow cannot proceed, and show the update gate.
++			this.termsAreSet = false;
++			this.$.continueBtn.setDisabled(true);
+ 			enyo.application.FirstUse.closeAllPopups(); // if I don't do this can get into case where the UI locks up because of a bug.
+ 			this.$.popup_palm_error_body_error_code.hide(false);
+ 			try {this.$.popup_palm_error_body_error_code.setContent(inResponse.errorCode + " : " + inResponse.errorText);} catch (e) {}
+ 			this.$.palmErrorPopup.openAtCenter();
+ 		}
+-		this.$.scrim.hide();	
++		this.$.scrim.hide();
+ 		this.$.spinner.setShowing(false);
+-		
++
+ 	},
+-	
++
+ 	continueButton: function(){
++		// webOS Archive: hard gate — never proceed unless the secure terms fetch worked.
++		if (!this.termsAreSet) {
++			this.$.palmErrorPopup.openAtCenter();
++			return;
++		}
+ 		if (this.$.palmCheckBox.getChecked()) {
+ 			this.doFinish();
+ 		} else {
+@@ -218,11 +238,17 @@
+ 	},
+ 	
+ 	palmError: function(){
+-		this.$.palmErrorPopup.close();		
++		this.$.palmErrorPopup.close();
+ 		this.$.palmPopup.close();
+ 		enyo.application.FirstUse.currentServiceCall = "";
+-		console.log("get wifi status...");
+-		this.$.getStatus.call({});
++		// webOS Archive: stock deleted the saved Wi-Fi profile and restarted the
++		// whole flow here — on an already-set-up device that's destructive.
++		// Just retry the terms fetch.
++		this.poppedError = false;
++		this.getTermsResponseCalled = false;
++		this.$.scrim.show();
++		this.$.spinner.setShowing(true);
++		this.getTerms();
+ 	},
+ 	
+ 	handleWiFiGetStatus:  function(inSource, inResponse) {

@@ -1,0 +1,171 @@
+--- a/com.palm.app.firstuse/FirstUse.js
++++ b/com.palm.app.firstuse/FirstUse.js
+@@ -34,9 +34,9 @@
+ 		languageCode: "",
+ 		serverURL: "",
+ 		googleTerms: "",
+-		dataConnection: false,
+-		dataConnectionType: "",
+-		dataConnectionInitialized: false,
++		dataConnection: true,
++		dataConnectionType: "wifi",
++		dataConnectionInitialized: true,
+ 		first: true,
+ 		createProfile: false,
+ 		firstName: "",
+@@ -72,14 +72,20 @@
+ 				{kind: "VFlexBox", align: "center", components: [
+ 					{kind: "Control", layoutKind: "VFlexLayout", align:'center', className:"contentDefaults", pack: 'justify', components: [
+ 						{name: "completeSetup", content: rb.$L("Thanks!"), className: "title"},
+-						{content: rb.$L("We're almost done. When we finish, we'll restart your device and you'll be ready to go."), className: "subtitle"},
+-						{kind: "SpinnerLarge", name: "spinner", showing: true},
++						{name: "completeSubtitle", content: rb.$L("Your webOS Account is ready to use."), className: "subtitle"},
++						{kind: "SpinnerLarge", name: "spinner", showing: false},
++						{name: "completeDone", kind: "Button", caption: rb.$L("Done"), className: "enyo-button", style: "width: 220px; margin-top: 24px;", onclick: "completeDoneTap"},
+ 					]}
+ 				]}
+ 			]}
+         ]},
+ 
+ 		{kind: "MyApps.FirstUse.SpinnerOverlayPopup", name: "spinnerOverlay"},
++
++		// webOS Archive: self-update via App Museum II (webos-common Updater-Helper).
++		// Checks the catalog entry titled "webOS Community Account Manager" and
++		// prompts + installs via Preware when a newer version is listed.
++		{kind: "Helpers.Updater", name: "updater", handleUI: true},
+ 		
+ 		{name: "SimStatusQuery", kind: "TelephonyService", method: "simStatusQuery",subscribe: true, onSuccess: "handleSimStatusQuery"},
+ 		{name: "PlatformQuery", kind: "TelephonyService", method: "platformQuery",subscribe: false, onSuccess: "handlePlatformQuery", onFailure: "handlePlatformQueryFail"},
+@@ -311,6 +317,17 @@
+ 			enyo.application.FirstUse = this;
+ 		}
+ 		this.start();
++
++		// webOS Archive: check the App Museum for a newer build of this app.
++		try {
++			// firstuse's stylesheet paints text white (dark theme); the updater's
++			// popup is light-backed — force readable text without editing the
++			// vendored helper.
++			this.$.updater.$.updatePopUp.addStyles("color: black;");
++			this.$.updater.CheckForUpdate("webOS Community Account Manager");
++		} catch (e) {
++			console.info("WOSA: update check failed to start: " + e);
++		}
+ 	},
+ 	
+ 	start: function() {
+@@ -378,17 +395,11 @@
+ 
+ 	
+ 	getRestoreInProgressSuccess: function(inSender, inResponse) {
+-		console.log("getRestoreInProgressSuccess: tokens[FIRSTUSE_RESTORE_IN_PROGRESS] = " + inResponse.FIRSTUSE_RESTORE_IN_PROGRESS);
+-		if (inResponse.FIRSTUSE_RESTORE_IN_PROGRESS) {
+-			this.$.registerForSMS.call({"register":false});
+-			this.$.setPalmProfile.call({FIRSTUSE_RESTORE_IN_PROGRESS : false});
+-			console.log("Cleaning up a partial restore.");
+-	        this.$.eraseVar.call();
+-	        // not calling nextStep(), because we're rebooting the device and I don't want a screen to show for 
+-	        // a second before reboot
+-		} else {
+-			this.nextStep();
+-		}
++		// webOS Archive: NEVER erase the device. The stock path here calls
++		// eraseVar (wipe /media/cryptofs/apps) + reboot to "clean up a partial
++		// restore" — that is exactly what wiped a dev device. We do restore
++		// nothing, so just advance.
++		this.nextStep();
+ 	},
+ 	
+ 	getRestoreInProgressFailure: function() {
+@@ -828,19 +839,31 @@
+ 	},
+ 	
+ 	done: function(){
+-		//this.$.doneButton.setDisabled(true);
+-		console.info("Making call to postLogin settings....");
+-		if (this.connectedWithWiFi) {
+-			this.$.setTimeZoneFromIP.call();
++		// webOS Archive: safe completion. The account + device token are already
++		// written by accountservices (createNovaAccount/authenticateAccount). Do NOT
++		// call the dead HP postLogin services, do NOT reset, do NOT shut down —
++		// leave the confirmation page up; the user dismisses it with Done.
++		console.info("WOSA firstrun: account setup complete — showing confirmation (no reset, no erase, no shutdown).");
++		this.updateCompletePage();
++	},
++
++	updateCompletePage: function(){
++		// getAccountToken is async — this runs from done() and again from
++		// getTokenResponse, whichever lands last wins with the alias filled in.
++		var alias = this.getAcctAlias();
++		if (alias) {
++			this.$.completeSubtitle.setContent("Signed in as " + alias + ". Your webOS Account is ready to use.");
+ 		} else {
+-			this.postTimeZoneResponseReturned = true; // we just pretend we called it in non-wifi mode other wise we hang.
++			this.$.completeSubtitle.setContent("Your webOS Account is ready to use.");
+ 		}
++	},
+ 
+-		console.log("Set Customizations: " + this.countryCode + " : " + this.languageCode);
+-		this.$.setCustomization.call({"language":this.languageCode,"country":this.countryCode});
++	completeDoneTap: function(){
++		this.closeApp();
++	},
+ 
+-		this.$.postLoginSettings.call();
+-		this.$.removeRestoreFailedFile.call();
++	closeApp: function(){
++		try { window.close(); } catch (e) { console.info("WOSA close err: " + e); }
+ 	},
+ 	
+ 	postTimeZoneResponse: function(inSender, inResponse){
+@@ -893,16 +916,10 @@
+ 	},
+ 	
+ 	firstUseComplete: function() {
+-		console.info("*********First Use  complete*************");
+-		if(!this.isOTAAvailable || (this.otaSkipped == true)) {
+-			console.info("Shutting down because OTA is not available");
+-			this.$.registerForSMS.call({"register":false});
+-			PalmSystem.shutdown();
+-		} else {
+-            PalmSystem.markFirstUseDone();            
+-			console.info("There is an update install it.");            
+-            this.$.installUpdate.call();
+-		}
++		// webOS Archive: never shut down / reset / mark-first-use / install updates.
++		// (belt-and-suspenders — done() closes directly and shouldn't reach here.)
++		console.info("WOSA firstrun complete — safe close.");
++		this.closeApp();
+ 	},
+ 	
+ 	performSoftwareUpdate: function() {
+@@ -921,16 +938,8 @@
+ 	
+     
+     powerDownDevice: function () {
+-		console.info("5 minute timed out, this.view: " + this.view);
+-		if (this.locale == "") {//Not the best way but we'll come back to this later
+-			if(!this.chargerConnected){
+-				console.info("5 mins no USB/Dock in Language screen, powering down now....");
+-				if (this.powerDownMethod) clearTimeout(this.powerDownMethod);
+-				this.$.powerDown.call({"reason": "user inactivity in firstuse"});
+-			} else {
+-				console.info("Not powering down, In Language screen but connected to charger: " + this.chargerConnected);
+-			}
+-		}
++		// webOS Archive: disabled the stock 5-minute inactivity auto-powerdown.
++		console.info("WOSA firstrun: powerDownDevice disabled (no auto-poweroff).");
+ 	},
+ 	
+ 	powerDownResponse:function(inSender, inResponse){
+@@ -1029,8 +1038,9 @@
+ 		if(inResponse.returnValue){
+ 			this.setAcctAlias(inResponse.accountAlias);
+ 			this.setAcctToken(inResponse.token);
++			this.updateCompletePage();
+ 			if (this.assignDeviceNameRetry) {
+-				this.assignDeviceName();	
++				this.assignDeviceName();
+ 			}
+ 		} else {
+ 			console.info("Could not get token info");

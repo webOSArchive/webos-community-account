@@ -1,0 +1,20 @@
+#!/bin/sh
+# webOS Account uninstaller (runs as root via Preware/ipkgservice).
+# Restores the pristine palmprofile service files and removes the app.
+# The device profile account and token are left untouched.
+
+APPID=com.palm.app.webosaccount
+SVC=/usr/palm/services/com.palm.service.palmprofile
+
+mount -o remount,rw / || exit 0
+
+for f in utils/palm_profile_util.js handlers/LoginProfileCommandAssistant.js handlers/IsEmailAvailableCommandAssistant.js handlers/GetTermsAndConditionsCommandAssistant.js; do
+    if [ -f "$SVC/$f.stock" ]; then
+        cp "$SVC/$f.stock" "$SVC/$f"
+    fi
+done
+
+rm -rf "/usr/palm/applications/$APPID"
+luna-send -n 1 palm://com.palm.applicationManager/rescan '{}' >/dev/null 2>&1 || true
+
+exit 0

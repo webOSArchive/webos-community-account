@@ -1,0 +1,307 @@
+--- a/com.palm.app.firstuse/source/signin/Signin.js
++++ b/com.palm.app.firstuse/source/signin/Signin.js
+@@ -1,7 +1,7 @@
+ //Header labels
+-label_header1_signin = rb.$L("HP webOS Account");
+-label_header2_signin = rb.$L("An HP webOS Account is key to access critical HP services.");
+-label_header3_signin = rb.$L("If you already have a webOS account (previously Palm Profile), you can sign in now.");
++label_header1_signin = rb.$L("webOS Account");
++label_header2_signin = rb.$L("A webOS Account connects this device to the community-run webOS App Museum.");
++label_header3_signin = rb.$L("If you already have an App Museum account, you can sign in now.");
+ 
+ label_header1_createProfile = rb.$L("Create a webOS Account");
+ 
+@@ -43,15 +43,15 @@
+ label_popup_body_existingProfile = rb.$L("There is already an account associated with that email address. Please sign in now or choose a new email address");
+ 
+ label_popup_header_palmProfile = rb.$L("About webOS Account");
+-label_popup_body_palmProfile = rb.$L("An HP webOS account (previously Palm Profile) is required to activate your device. In addition, your webOS account also gives you:<ul><li>A free account for storing data in Contacts and Calendar</li><li>Backup and restore of personal data and applications downloaded from App Catalog</li><li>Device software updates</li></ul></p>");
++label_popup_body_palmProfile = rb.$L("A webOS Account is the free community account used by the webOS App Museum. It lets you:<ul><li>Sign in on this device and on the App Museum website</li><li>Use community services as they come online</li></ul></p>");
+ 
+ label_popup_header_forgotEmail = rb.$L("Forgot Email?");
+-label_popup_body1_forgotEmail = rb.$L("Visit http://hpwebos.com/support for assistance.");
++label_popup_body1_forgotEmail = rb.$L("Visit webosarchive.org for assistance.");
+ //label_popup_body2_forgotEmail = rb.$L("Open Device Info");
+ //label_popup_body3_forgotEmail = rb.$L("Your email address is listed under webOS Account. Need more help finding your email address? Visit http://hpwebos.com/support.");
+ 
+ label_popup_header_forgotPassword = rb.$L("Forgot Password?");
+-label_popup_body1_forgotPassword = rb.$L("Please enter the email address you used to create your webOS account (previously Palm Profile).");
++label_popup_body1_forgotPassword = rb.$L("Please enter the email address you used to create your webOS Account.");
+ 
+ label_popup_header_recoverPassword = rb.$L("Recover Password");
+ label_popup_body1_recoverPassword = rb.$L("Answer your security question to recover your password.");
+@@ -59,31 +59,31 @@
+ 
+ label_popup_header_recoverPwdSentEmailPopup = rb.$L("Recover Password");
+ label_popup_body1_recoverPwdSentEmailPopup = rb.$L("Follow the link in that email to reset your password.");
+-label_popup_body2_recoverPwdSentEmailPopup = rb.$L("If you're unable to reset your password, visit http://hpwebos.com/support for more help.");
++label_popup_body2_recoverPwdSentEmailPopup = rb.$L("If you're unable to reset your password, visit webosarchive.org for more help.");
+ 
+ label_popup_header_newPwdPopup = rb.$L("New Password");
+ label_popup_body1_newPwdPopup = rb.$L("Create a new password for your webOS account.");
+ 
+ label_popup_header_embargoedEmailPopup = rb.$L("Invalid Email Address");
+-label_popup_body1_embargoedEmailPopup = rb.$L("The United States Government prohibits HP from allowing you to use this email address to set up a webOS account.");
++label_popup_body1_embargoedEmailPopup = rb.$L("This email address cannot be used to set up a webOS Account.");
+ 
+ label_popup_header_embargoedEmailHelpPopup = rb.$L("Invalid Email Address");
+-label_popup_body1_embargoedEmailHelpPopup = rb.$L("The United States Government restricts exports to certain countries, including the country where your email address domain is issued. You can visit www.palm.com/us/company/legal for additional information.");
++label_popup_body1_embargoedEmailHelpPopup = rb.$L("You can visit webosarchive.org for additional information.");
+ label_popup_body2_embargoedEmailHelpPopup = rb.$L("You may return your device where you purchased it in accordance with the applicable return poilicy.");
+ 
+ //Error texts
+ label_error_invalidSignInEmailText = rb.$L("Please enter a valid email address.");
+ label_error_invalidSignInPassword = rb.$L("The password you entered is incorrect. Try again.");
+ label_error_noProfileFoundText = rb.$L("We couldn't find a webOS account associated with that email address.");
+-label_error_unableToSignInText = rb.$L("We were unable to sign you in. Please try again in a few minutes or contact HP for help resolving this problem. Visit http://hpwebos.com/support for more information.");
+-label_error_unableToCreateAccountText = rb.$L("We are unable to create an account for you. Please try again in a few minutes or contact HP for help resolving this problem. Visit http://hpwebos.com/support for more information.");
+-label_error_unableToCreateAccountTextNetworkingIssue = rb.$L("We are unable to create a new account right now. Please try again in a few minutes or contact HP for help resolving this problem. Visit http://hpwebos.com/support for more information.");
++label_error_unableToSignInText = rb.$L("We were unable to sign you in. Please try again in a few minutes. If the problem continues, visit webosarchive.org for help.");
++label_error_unableToCreateAccountText = rb.$L("We are unable to create an account for you. Please try again in a few minutes. If the problem continues, visit webosarchive.org for help.");
++label_error_unableToCreateAccountTextNetworkingIssue = rb.$L("We are unable to create a new account right now. Please try again in a few minutes. If the problem continues, visit webosarchive.org for help.");
+ label_error_noNameText = rb.$L("Please enter your name.");
+ label_error_nameLengthText = rb.$L("Name must be less than 50 characters.");
+ label_error_emailInvalidText = rb.$L("Please enter a valid email address.");
+ label_error_emailMismatchText = rb.$L("Email addresses do not match.");
+ label_error_passwordMismatchText = rb.$L("Passwords do not match.");
+-label_error_passwordLengthText = rb.$L("Password must be 6-20 characters.");
++label_error_passwordLengthText = rb.$L("Password must be at least 8 characters.");
+ label_error_answerText = rb.$L("Please answer the security question.");
+ label_error_answerLength = rb.$L("Security answer must be less than 50 characters.");
+ label_error_nameDeviceLengthText = rb.$L("Device name is limited to 256 characters. Shorten name and try again.");
+@@ -119,7 +119,7 @@
+ 						{kind:"Control", layoutKind: "VFlexLayout", className: 'login', align: 'center', flex:1, components:[
+ 							{kind: "Control", layoutKind: "VFlexLayout", align:'center', className:"contentDefaults", pack: 'justify', components: [
+ 								{content: rb.$L("Let's get started"), className: "title"},
+-								{content: rb.$L("If you've ever owned an HP or Palm webOS phone or TouchPad, tap Sign In. Otherwise, create a new account."), className: "subtitle"},
++								{content: rb.$L("If you already have a webOS App Museum account, tap Sign In. Otherwise, create a new account."), className: "subtitle"},
+ 								{kind: enyo.Control, className: "box", style: "margin: 0; padding: 10px 45px; -webkit-border-image: none ", components: [
+ 										{kind: "Button", caption: rb.$L("Sign In"), flex:1, className: "enyo-button-light", onclick: "createSignInView"},
+ 										{kind: "Button", caption: rb.$L("Create New Account"), flex:1, style:"margin-top: 20px", className: "enyo-button-light", onclick: "createAccountView"},
+@@ -135,7 +135,7 @@
+ 						{kind:"Control", layoutKind: "VFlexLayout", className: 'login', align: 'center', flex:1, components:[
+ 							{kind: "Control", layoutKind: "VFlexLayout", align:'center', className:"contentDefaults2", pack: 'justify', components: [
+ 								{content: rb.$L("Sign In"), className: "title"},
+-								{content: rb.$L("Sign in to your HP webOS Account or Palm Profile to copy your applications, accounts and data to your TouchPad."), className: "subtitle"},
++								{content: rb.$L("Sign in to your webOS Account to connect this device to the App Museum."), className: "subtitle"},
+ 								{kind: "Control", className: "box", style:"margin-top: 15px", components: [
+ 									{kind: "Control", className: "form-row", components: [
+ 										{content: label_field_email, className: "label"},
+@@ -165,7 +165,7 @@
+ 						{kind:"Control", layoutKind: "VFlexLayout", className: 'login', align: 'center', flex:1, components:[
+ 							{kind: "Control", layoutKind: "VFlexLayout", align:'center', className:"contentDefaults2", style:"550px", pack: 'justify', components: [
+ 								{content: label_header1_createProfile, className: "title"},
+-								{content: rb.$L("You need an HP webOS account to use this device. Your data, accounts, application download and purchase history will be securely backed up."), className: "subtitle"},
++								{content: rb.$L("Create a free webOS Account to connect this device to the App Museum community."), className: "subtitle"},
+ 								{kind: "Control", className: "box", components: [
+ 									{kind: "Control", className: "form-row", components: [
+ 										{content: label_field_name, className: "label"},
+@@ -193,14 +193,17 @@
+ 										{name: "createPasswordConfirm", kind: "Input", inputType: "password", hint: "", className: "field", oninput: "createPasswordConfirmOnInput", onkeydown: "createPasswordConfirmOnKeyPress", onblur:"createPasswordConfirmOnBlur", onchange: "createPasswordConfirmOnChange", changeOnKeypress: false,},
+ 										{name: "passwordConfirmText", content: label_error_passwordMismatchText, className: "message", showing: false},
+ 									]},
+-									{kind: "Control", className: "form-row", components: [
++									// webOS Archive: security question dropped — the server never stored
++									// it and recovery is handled by the Archive, not on-device. The
++									// components stay (hidden) so the create payload keeps its shape.
++									{kind: "Control", className: "form-row", showing: false, components: [
+ 										{content: label_field_securityQuestion, className: "label"},
+ 										{kind: "Group", components: [
+ 										{name: "listSelector", kind: "ListSelector", className: "list-selector", style: "padding:5px 13px", value: "", /*onChange: "questionSelected",*/ items: [
+ 											{"caption": "", "value": "", hideItem: true}
+ 										]}]}
+ 									]},
+-									{kind: "Control", className: "form-row", components: [
++									{kind: "Control", className: "form-row", showing: false, components: [
+ 										{content: label_field_securityAnswer, className: "label"},
+ 										{name: "createAnswer", kind: "Input", hint: "", className: "field", onblur: "createAnswerOnBlur", onchange: "createAnswerOnChange", oninput: "createAnswerOnInput", onkeydown: "createAnswerOnKeyPress", changeOnKeypress: false, autoCapitalize: "lowercase", autocorrect: false, spellcheck: false},
+ 										{name: "answerText", content: label_error_answerText, className: "message", showing: false},
+@@ -404,7 +407,7 @@
+ 	    			this.$.signInButton.setDisabled(true);
+ 	    		}else{
+ 	    			this.$.invalidSignInEmailLengthText.setShowing(false);
+-	    			if (this.$.signInPassword.getValue().length < 6 || this.$.signInPassword.getValue().length > 20){
++	    			if (this.$.signInPassword.getValue().length < 1){
+ 						this.$.signInButton.setDisabled(true);
+ 					} else {
+ 						this.$.signInButton.setDisabled(false);
+@@ -421,7 +424,7 @@
+     	this.$.invalidSignInEmailText.setShowing(false);
+     	this.$.invalidSignInEmailLengthText.setShowing(false);
+ 		if (this.verifyEmail(this.$.signInEmail.getValue()) && this.verifyEmailLength(this.$.signInEmail.getValue()) ) {
+-			if (this.$.signInPassword.getValue().length < 6 || this.$.signInPassword.getValue().length > 20){
++			if (this.$.signInPassword.getValue().length < 1){
+ 				this.$.signInButton.setDisabled(true);
+ 			} else {
+ 				this.$.signInButton.setDisabled(false);
+@@ -455,7 +458,7 @@
+ 
+ 		if(!passEmpty) {
+ 			var l = this.$.signInPassword.getValue().length;
+-			if (l < 6 || l > 20) {
++			if (l < 1) {
+ 				this.$.signInPasswordLengthText.setShowing(true);
+ 				this.$.signInButton.setDisabled(true);
+ 			} else if (passEmpty) {
+@@ -463,7 +466,7 @@
+ 			} else {
+ 				this.$.signInPasswordLengthText.setShowing(false);
+ 				if (this.verifyEmail(this.$.signInEmail.getValue()) && this.verifyEmailLength(this.$.signInEmail.getValue()) ) {
+-					if (this.$.signInPassword.getValue().length < 6 || this.$.signInPassword.getValue().length > 20 || passEmpty){
++					if (this.$.signInPassword.getValue().length < 1 || passEmpty){
+ 						this.$.signInButton.setDisabled(true);
+ 					} else {
+ 						this.$.signInButton.setDisabled(false);
+@@ -483,7 +486,7 @@
+ 		var passEmpty = this.trim(this.$.signInPassword.getValue()).length == 0;
+ 		
+ 		if (this.verifyEmail(this.$.signInEmail.getValue()) && this.verifyEmailLength(this.$.signInEmail.getValue()) ) {
+-			if (this.$.signInPassword.getValue().length < 6 || this.$.signInPassword.getValue().length > 20 || passEmpty){
++			if (this.$.signInPassword.getValue().length < 1 || passEmpty){
+ 				this.$.signInButton.setDisabled(true);
+ 			} else {
+ 				this.$.signInButton.setDisabled(false);
+@@ -499,7 +502,7 @@
+ 			this.signInPasswordOnChange();
+ 			if (this.verifyEmail(this.$.signInEmail.getValue()) && this.verifyEmailLength(this.$.signInEmail.getValue())) {
+ 				this.$.signInButton.doClick();
+-			} else if (this.$.signInPassword.getValue().length < 6 || this.$.signInPassword.getValue().length > 20 || passEmpty) {
++			} else if (this.$.signInPassword.getValue().length < 1 || passEmpty) {
+ 				this.$.signInPassword.forceFocus();
+ 				this.$.signInPassword.forceSelect();
+ 			} else {
+@@ -712,7 +715,7 @@
+ 		if (passEmpty) {
+ 			this.$.createPassword.setValue("");
+ 			this.toggleCreateButton(false);
+-		} else if(l < 6 || l > 20) {
++		} else if(l < 8) {
+ 			this.isErrorDisplayed = true;
+ 			this.$.passwordLengthText.setShowing(true);
+ 			this.toggleCreateButton(false);
+@@ -777,7 +780,7 @@
+ 			this.$.passwordConfirmText.setContent(label_error_passwordMismatchText);
+ 			this.$.passwordConfirmText.setShowing(true);
+ 			this.toggleCreateButton(false);			
+-		} else if(l < 6 || l > 20 || (pl > 0 && (pl < 6 || pl > 20))) {
++		} else if(l < 8 || (pl > 0 && pl < 8)) {
+ 			this.isErrorDisplayed = true;
+ 			this.$.passwordConfirmText.setContent(label_error_passwordLengthText);
+ 			this.$.passwordConfirmText.setShowing(true);
+@@ -875,8 +878,7 @@
+ 			return false;
+ 		if(!this.verifyPasswords(this.$.createPassword.getValue(), this.$.createPasswordConfirm.getValue()))
+ 			return false;
+-		if(this.trim(this.$.createAnswer.getValue()).length <1 || this.trim(this.$.createAnswer.getValue()).length > 50)
+-			return false;
++		// webOS Archive: security answer no longer collected — not validated.
+ 		if(!this.verifyEmailLength(this.$.createEmail.getValue()) || !this.verifyEmailLength(this.$.createEmailConfirm.getValue()) )
+ 			return false;
+ 		console.info("All input fields valid");
+@@ -977,7 +979,7 @@
+ 		var lenPW = this.$.signInPassword.getValue().length;
+ 		var passEmpty = this.trim(this.$.signInPassword.getValue()) == "";
+ 
+-		if (!passEmpty && lenPW >= 6 && lenPW <=20 && this.verifyEmail(this.$.signInEmail.getValue()) && this.verifyEmailLength(this.$.signInEmail.getValue())) {
++		if (!passEmpty && lenPW >= 1 && this.verifyEmail(this.$.signInEmail.getValue()) && this.verifyEmailLength(this.$.signInEmail.getValue())) {
+ 			this.blurSignInInputFields();
+ 			this.clearAllSignInErrorMessages();
+ 			this.$.scrim.show();
+@@ -1173,6 +1175,9 @@
+ 	},
+ 	
+ 	getQuestionsSpinnerCommon: function(showSpinner){
++		// webOS Archive: the security-question fields are hidden, so don't fetch
++		// the question list at all — one less network round-trip on card open.
++		return;
+ 		var locale = enyo.g11n.currentLocale();
+ 		if (this.$.listSelector.items == null || this.$.listSelector.items.length <= 1) {
+ 			if(enyo.application.FirstUse.getDataConnection()){
+@@ -1438,13 +1443,13 @@
+ 				this.$.confirmPwdDontMatchText.setShowing(false);
+ 			}
+ 		}
+-		if (pl < 6 || pl > 20) {
++		if (pl < 8) {
+ 			this.$.pwdLengthText.setShowing(true);
+ 		} else {
+ 			this.$.pwdLengthText.setShowing(false);
+ 		}
+ 		
+-		if (pl < 6 || pl > 20 || cl < 6 || cl < 20) {
++		if (pl < 8 || cl < 8) {
+ 			this.$.signInWithPwdButton.setDisabled(true);
+ 		} else {
+ 			this.$.signInWithPwdButton.setDisabled(false);
+@@ -1460,7 +1465,7 @@
+ 
+ 		var pl = this.$.newPasswordInput.getValue().length;
+ 		var cl = this.$.newConfirmPasswordInput.getValue().length;
+-		if (pl < 6 || pl > 20 || cl < 6 || cl < 20) {
++		if (pl < 8 || cl < 8) {
+ 			this.$.signInWithPwdButton.setDisabled(true);
+ 		} else {
+ 			this.$.signInWithPwdButton.setDisabled(false);
+@@ -1471,7 +1476,7 @@
+ 		if(inResponse.keyCode == 13){
+ 			this.newPasswordInputOnChange();
+ 			var pl = this.$.newPasswordInput.getValue().length;
+-			if (pl >= 6 && pl <= 20) {
++			if (pl >= 8) {
+ 				this.$.newConfirmPasswordInput.forceFocus();
+ 				this.$.newConfirmPasswordInput.forceSelect();
+ 			} 
+@@ -1485,11 +1490,11 @@
+ 	newPasswordInputOnBlur: function(){
+ 		var pl = this.$.newPasswordInput.getValue().length;
+ 		var cl = this.$.newConfirmPasswordInput.getValue().length;
+-		if (pl < 6 || pl > 20) {
++		if (pl < 8) {
+ 			this.$.pwdLengthText.setShowing(true);
+ 			this.$.signInWithPwdButton.setDisabled(true);
+ 		} else if(cl>0){
+-			if(cl > 5 && cl < 21){
++			if(cl >= 8){
+ 				if(this.$.newPasswordInput.getValue() != this.$.newConfirmPasswordInput.getValue()){
+ 					this.$.confirmPwdDontMatchText.setShowing(true);
+ 					this.$.signInWithPwdButton.setDisabled(true);
+@@ -1542,7 +1547,7 @@
+ 		var cl = this.$.newConfirmPasswordInput.getValue().length;
+ 		if (this.$.newConfirmPasswordInput.getValue() != this.$.newPasswordInput.getValue()){
+ 			this.$.confirmPwdDontMatchText.setShowing(true);
+-		} else if( (pl < 6 || pl > 20) || (cl <6 || cl > 20) ){
++		} else if( pl < 8 || cl < 8 ){
+ 			this.$.pwdLengthText.setShowing(true);
+ 			this.$.signInWithPwdButton.setDisabled(true);
+ 		}else {
+@@ -1836,7 +1841,7 @@
+ 	},
+ 	
+ 	verifyPasswords: function(pwd1, pwd2){
+-		if(pwd1.length < 6 || pwd1.length > 20 || pwd2.length < 6 || pwd2.length >20 || pwd1 != pwd2)
++		if(pwd1.length < 8 || pwd2.length < 8 || pwd1 != pwd2)
+ 			return false;
+ 		return true;
+ 	},
+@@ -1976,13 +1981,14 @@
+ 	},
+ 	
+ 	doPostSignInChecks: function(){
+-		if (this.createdPostSignIn) {
+-			this.$.postSignIn.reset();
+-			console.log("doPostSignInChecks called twice, this should NEVER happen but we have seen it happen once when having network errors. JIRA DFISH-7207.");
+-		} else {
+-			this.createdPostSignIn = true;
+-			this.createComponent({name: "postSignIn", kind:"PostSignIn", onFinish: "postSignInDone"});
+-		}
++		// webOS Archive: skip the stock post-sign-in checks. PostSignIn runs an OTA
++		// software-update check (no update service exists -> hangs) and a backup-devices
++		// check (dead HP backend). The account + token are already written by
++		// accountservices, so go straight to finish. Handles both sign-in and create.
++		console.info("WOSA: skipping PostSignIn OTA/backup checks — finishing sign-in.");
++		this.$.scrim.hide();
++		this.$.spinner.setShowing(false);
++		this.doFinish();
+ 	},
+ 	
+ 	postSignInDone: function(){	

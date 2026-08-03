@@ -1,0 +1,75 @@
+#!/bin/sh
+# package.sh — build the distributable IPK for the webOS Account app.
+#
+# The app is BUILT ON A DEVICE (deploy.sh clones stock firstuse + applies our
+# patches — we don't keep HP's source in the repo), so packaging PULLS the built
+# artifacts from a device that deploy.sh has been run against:
+#   1. /usr/palm/applications/com.palm.app.webosaccount  (the patched app)
+#   2. the two patched palmprofile service files
+# and assembles a Preware-installable IPK whose postinst replays the deploy on
+# the target device (app -> rootfs, service files patched with .stock backups).
+#
+# IMPORTANT: install via Preware / org.webosinternals.ipkgservice (this is what
+# the on-device Museum app uses) — the stock appinstaller does not run postinst.
+#
+# Usage: deploy.sh first (and ideally verify sign-in), then: scripts/package.sh
+set -e
+HERE="$(cd "$(dirname "$0")/.." && pwd)"      # webos/
+PKG=org.webosarchive.webosaccount
+VERSION=$(sed -n 's/.*"version": *"\([^"]*\)".*/\1/p' "$HERE/app/appinfo.json" | head -1)
+APPID=com.palm.app.webosaccount
+SVC=/usr/palm/services/com.palm.service.palmprofile
+BUILD="$HERE/dist/build"
+IPK="$HERE/dist/${PKG}_${VERSION}_all.ipk"
+
+STAGE_REL=usr/palm/webosarchive/webosaccount   # under /media/cryptofs/apps on device
+rm -rf "$BUILD"
+mkdir -p "$BUILD/data/$STAGE_REL/service"
+
+echo ">> 1) pull built app from device"
+novacom run file:///bin/tar -- czf - -C /usr/palm/applications "$APPID" > "$BUILD/app.tgz"
+mkdir -p "$BUILD/apptmp"
+tar xzf "$BUILD/app.tgz" -C "$BUILD/apptmp"
+mv "$BUILD/apptmp/$APPID" "$BUILD/data/$STAGE_REL/app"
+find "$BUILD/data" -name '*.stock' -delete   # deploy.sh leaves pristine copies next to patched files
+
+echo ">> 2) pull patched service files from device"
+novacom run file:///bin/cat -- "$SVC/utils/palm_profile_util.js"                   > "$BUILD/data/$STAGE_REL/service/palm_profile_util.js"
+novacom run file:///bin/cat -- "$SVC/handlers/LoginProfileCommandAssistant.js"     > "$BUILD/data/$STAGE_REL/service/LoginProfileCommandAssistant.js"
+novacom run file:///bin/cat -- "$SVC/handlers/IsEmailAvailableCommandAssistant.js" > "$BUILD/data/$STAGE_REL/service/IsEmailAvailableCommandAssistant.js"
+novacom run file:///bin/cat -- "$SVC/handlers/GetTermsAndConditionsCommandAssistant.js" > "$BUILD/data/$STAGE_REL/service/GetTermsAndConditionsCommandAssistant.js"
+
+echo ">> 3) sanity-check the payload actually carries our patches"
+grep -q "updateCompletePage" "$BUILD/data/$STAGE_REL/app/FirstUse.js"
+grep -q "WOSA" "$BUILD/data/$STAGE_REL/app/source/tnc/Palm.js"
+grep -q "WOSA_BASE" "$BUILD/data/$STAGE_REL/service/palm_profile_util.js"
+grep -q "WOSA" "$BUILD/data/$STAGE_REL/service/IsEmailAvailableCommandAssistant.js"
+grep -q "\"visible\": true" "$BUILD/data/$STAGE_REL/app/resources/en/appinfo.json"
+echo "   ok"
+
+echo ">> 4) assemble ipk"
+mkdir -p "$BUILD/control"
+cat > "$BUILD/control/control" <<EOF
+Package: $PKG
+Version: $VERSION
+Section: misc
+Priority: optional
+Architecture: all
+Maintainer: webOS Archive <webmaster@webosarchive.org>
+Description: webOS Community Account Manager
+Source: {"Type": "Application", "Title": "webOS Account", "FullDescription": "Optional community account setup. Signed-in account becomes your device profile, and will be used for App Catalog features. Installs a small patch redirecting the long-dead HP account service to the community backend (original files are preserved and restored on uninstall), over-writing the Dr. Skipped First Use with a more useful account."}
+webOS-Package-Format-Version: 2
+EOF
+cp "$HERE/ipk/postinst" "$HERE/ipk/prerm" "$BUILD/control/"
+chmod 755 "$BUILD/control/postinst" "$BUILD/control/prerm"
+
+printf '2.0\n' > "$BUILD/debian-binary"
+# BusyBox/ipkg-friendly tarballs: ustar format, root ownership, no macOS xattr
+# turds, and the "./" member prefix ipkg's extractor REQUIRES (rc 22 without it)
+( cd "$BUILD/control" && COPYFILE_DISABLE=1 tar --format ustar --uid 0 --gid 0 --numeric-owner -czf ../control.tar.gz ./control ./postinst ./prerm )
+( cd "$BUILD/data"    && COPYFILE_DISABLE=1 tar --format ustar --uid 0 --gid 0 --numeric-owner -czf ../data.tar.gz ./usr )
+rm -f "$IPK"
+( cd "$BUILD" && ar rc "$IPK" debian-binary control.tar.gz data.tar.gz )
+
+echo ">> built: $IPK"
+ls -la "$IPK"

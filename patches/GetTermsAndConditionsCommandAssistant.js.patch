@@ -1,0 +1,14 @@
+--- a/com.palm.service.palmprofile/handlers/GetTermsAndConditionsCommandAssistant.js
++++ b/com.palm.service.palmprofile/handlers/GetTermsAndConditionsCommandAssistant.js
+@@ -64,8 +64,9 @@
+ 				}
+ 			};
+ 
+-			ServiceLog.log("Sending request to server with method:", url+methodName);
+-			return Foundations.Comms.AjaxCall.post(url + methodName, messageBody, headers);
++			// webOS Archive: route through curl (node TLS can't reach our https origin).
++			ServiceLog.log("Sending terms request (curl/https) to:", url+methodName);
++			return PalmProfileUtil.curlPost(url + methodName, messageBody, headers);
+         }
+ });
+ 
