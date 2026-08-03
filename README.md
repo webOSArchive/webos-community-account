@@ -1,8 +1,8 @@
-# webOS device integration — account setup + unlock
+# webOS Community Account Manager
 
-On-device pieces that connect a physical webOS TouchPad (`topaz`) to the App Museum
-account system. Companion to [`../DEVICE_ACCOUNT_PLAN.md`](../DEVICE_ACCOUNT_PLAN.md)
-(the full plan, status, and polish list).
+On-device pieces that connect a physical webOS TouchPad (`topaz`) to an App Museum catalog
+account system. This will be used to enable Developers to manage their apps, users to provide
+feedback (reviews, ratings) on apps, and potentially other functionality in the future.
 
 **Status:** verified working on hardware — sign in on-device with a catalog account,
 it becomes the device profile, **without wiping the device**.
