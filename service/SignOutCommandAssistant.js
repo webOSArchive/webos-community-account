@@ -18,13 +18,19 @@
  *    so, and the stranded token can still be revoked from another device once
  *    "remove this device" exists.
  *
- * 2. The local ACCOUNT record is left in place and only its token is cleared.
- *    Deleting it would be the true inverse of createLocalAccount, but
- *    com.palm.app.accounts reads palmProfileAccount.username/.icon unguarded in
- *    onAccountsAvailable, so removing the record outright breaks the Accounts app
- *    on the next launch. Clearing the token is enough for everything that matters:
- *    getAccountToken then fails, which is what the Accounts app's capability probe
- *    and the webOS Account app's launch probe both key off.
+ * 2. The local ACCOUNT record is renamed rather than deleted. Deleting it would be
+ *    the true inverse of createLocalAccount, but com.palm.app.accounts reads
+ *    palmProfileAccount.username/.icon unguarded in onAccountsAvailable, and a
+ *    device with no palmprofile account at all is a state nothing else on the
+ *    system has been tested against — the activation bypass creates one precisely
+ *    so it is never absent. Renaming keeps the structure valid.
+ *
+ *    It MUST be renamed, though, not just left: the record stores the signed-in
+ *    member's display name, so leaving it means handing the tablet to someone else
+ *    with the previous owner's name still sitting in db8 and on the Accounts
+ *    screen. It is set to a neutral "Local User" here rather than being papered
+ *    over in the UI, so there is one truth and no personal data survives a
+ *    sign-out.
  */
 var SignOutCommandAssistant = Class.create({
 
@@ -42,9 +48,11 @@ var SignOutCommandAssistant = Class.create({
 			}
 
 			if (!token) {
-				// Already signed out. Idempotent rather than an error: a caller
-				// retrying after a half-finished sign-out should succeed.
-				future.result = { "returnValue": true, "serverTokenRevoked": false };
+				// Already signed out — but still fall through to the rename rather
+				// than returning here. A sign-out that cleared the token and then
+				// failed to rename would otherwise be unrepairable by retrying,
+				// leaving the previous member's name on the device permanently.
+				this.renameLocalAccount(future, false);
 				return;
 			}
 			this.revokeOnServer(future, token);
@@ -69,9 +77,6 @@ var SignOutCommandAssistant = Class.create({
 	},
 
 	clearLocalToken: function (future, revoked) {
-		var done = function () {
-			future.result = { "returnValue": true, "serverTokenRevoked": revoked };
-		};
 		try {
 			var dbService = new PalmProfileDBService();
 			// Blank the fields that say "signed in". The record itself stays; the
@@ -83,13 +88,75 @@ var SignOutCommandAssistant = Class.create({
 				try { dbFuture.result; } catch (e) {
 					ServiceLog.log("signOut: db8 clear reported an error: " + e);
 				}
-				done();
+				this.renameLocalAccount(future, revoked);
 			});
 		} catch (e) {
-			// Never leave the command unresolved — a hung sign-out is worse than a
-			// reported partial one.
 			ServiceLog.log("signOut: could not clear the local token: " + e);
-			done();
+			this.renameLocalAccount(future, revoked);
+		}
+	},
+
+	// Strip the previous member's name off the local account record. Mirrors
+	// createLocalAccount's upsert, in reverse.
+	renameLocalAccount: function (future, revoked) {
+		var self = this;
+		var finish = function (renamed) {
+			future.result = {
+				"returnValue": true,
+				"serverTokenRevoked": revoked,
+				"localAccountRenamed": renamed
+			};
+		};
+
+		try {
+			var listFuture = PalmCall.call("palm://com.palm.service.accounts/", "listAccounts", {});
+			listFuture.then(function () {
+				var existing = null, i, res = null;
+				try { res = listFuture.result; } catch (e) {
+					ServiceLog.log("signOut: listAccounts failed: " + e);
+				}
+				if (res && res.results) {
+					for (i = 0; i < res.results.length; i++) {
+						if (res.results[i].templateId === "com.palm.palmprofile") {
+							existing = res.results[i];
+							break;
+						}
+					}
+				}
+				if (!existing) {
+					ServiceLog.log("signOut: no palmprofile account to rename.");
+					finish(false);
+					return;
+				}
+				if (existing.username === SignOutCommandAssistant.LOCAL_USER) {
+					finish(true);   // already neutral
+					return;
+				}
+				var modFuture = PalmCall.call("palm://com.palm.service.accounts/", "modifyAccount", {
+					"accountId": existing._id,
+					"object": { "username": SignOutCommandAssistant.LOCAL_USER }
+				});
+				modFuture.then(function () {
+					var ok = true;
+					try {
+						modFuture.result;
+					} catch (e) {
+						ok = false;
+						// Worth being loud about: the sign-out otherwise looks
+						// complete while the previous owner's name is still on screen.
+						ServiceLog.log("signOut: could NOT rename the local account: " + e);
+					}
+					finish(ok);
+				});
+			});
+		} catch (e) {
+			ServiceLog.log("signOut: rename step failed outright: " + e);
+			finish(false);
 		}
 	}
 });
+
+// Neutral name left on the device account after a sign-out. Deliberately not
+// localised: it is stored data, and it would otherwise be frozen in whatever
+// locale happened to be active when the user signed out.
+SignOutCommandAssistant.LOCAL_USER = "Local User";
