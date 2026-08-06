@@ -12,7 +12,6 @@
 APPID=com.palm.app.webosaccount
 STAGE=/media/cryptofs/apps/usr/palm/webosarchive/webosaccount
 SVC=/usr/palm/services/com.palm.service.palmprofile
-ACC=/usr/palm/applications/com.palm.app.accounts
 
 if [ ! -d "$STAGE/app" ]; then
     echo "webosaccount: staging payload missing at $STAGE" >&2
@@ -33,28 +32,16 @@ done
 # Purely ours — no stock file to preserve, so prerm deletes it outright.
 cp "$STAGE/service/UpdateUsernameCommandAssistant.js" "$SVC/handlers/UpdateUsernameCommandAssistant.js" || exit 1
 
-# 2) the stock Accounts settings app: revive its profile editor and put the
-# account username where HP had the security question.
-if [ -d "$ACC" ]; then
-    for f in depends.js source/palmID/ProfileSettings.js source/palmID/PalmIDUtilities.js source/palmID/PasswdDialog.js; do
-        if [ -f "$ACC/$f" ] && [ ! -f "$ACC/$f.stock" ]; then
-            cp "$ACC/$f" "$ACC/$f.stock"
-        fi
-        cp "$STAGE/accounts/$f" "$ACC/$f" || exit 1
-    done
-    cp "$STAGE/accounts/source/palmID/UsernameDialog.js" "$ACC/source/palmID/UsernameDialog.js" || exit 1
-fi
-
-# 3) the app itself
+# 2) the app itself
 rm -rf "/usr/palm/applications/$APPID"
 cp -r "$STAGE/app" "/usr/palm/applications/$APPID" || exit 1
 
-# 4) restart the palmprofile service. Handlers hot-reload per call, but
+# 3) restart the palmprofile service. Handlers hot-reload per call, but
 # services.json/sources.json are only read when the service host starts, so
 # without this updateUsername stays unknown until the next reboot.
 kill $(ps | grep "[c]om.palm.service.palmprofile" | awk '{print $1}') >/dev/null 2>&1 || true
 
-# 5) register with the launcher
+# 4) register with the launcher
 luna-send -n 1 palm://com.palm.applicationManager/rescan '{}' >/dev/null 2>&1 || true
 
 exit 0

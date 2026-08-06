@@ -6,8 +6,10 @@
 # artifacts from a device that deploy.sh has been run against:
 #   1. /usr/palm/applications/com.palm.app.webosaccount  (the patched app)
 #   2. the patched palmprofile service files (+ our updateUsername assistant)
-#   3. the patched files of the STOCK Accounts settings app, whose profile
-#      editor we revived and gave a username row
+#
+# (The Accounts settings app is NOT packaged here — it now lives as source in the
+# webOS-ports core-apps repo; see the note in deploy.sh.)
+#
 # and assembles a Preware-installable IPK whose postinst replays the deploy on
 # the target device (app -> rootfs, service files patched with .stock backups).
 #
@@ -21,7 +23,6 @@ PKG=org.webosarchive.webosaccount
 VERSION=$(sed -n 's/.*"version": *"\([^"]*\)".*/\1/p' "$HERE/app/appinfo.json" | head -1)
 APPID=com.palm.app.webosaccount
 SVC=/usr/palm/services/com.palm.service.palmprofile
-ACC=/usr/palm/applications/com.palm.app.accounts   # stock Accounts settings app
 BUILD="$HERE/dist/build"
 IPK="$HERE/dist/${PKG}_${VERSION}_all.ipk"
 
@@ -48,13 +49,6 @@ novacom run file:///bin/cat -- "$SVC/handlers/UpdateUsernameCommandAssistant.js"
 novacom run file:///bin/cat -- "$SVC/services.json"                                > "$BUILD/data/$STAGE_REL/service/services.json"
 novacom run file:///bin/cat -- "$SVC/sources.json"                                 > "$BUILD/data/$STAGE_REL/service/sources.json"
 
-echo ">> 2b) pull patched Accounts settings app files from device"
-mkdir -p "$BUILD/data/$STAGE_REL/accounts/source/palmID"
-novacom run file:///bin/cat -- "$ACC/depends.js"                       > "$BUILD/data/$STAGE_REL/accounts/depends.js"
-for f in ProfileSettings.js PalmIDUtilities.js PasswdDialog.js UsernameDialog.js; do
-    novacom run file:///bin/cat -- "$ACC/source/palmID/$f"             > "$BUILD/data/$STAGE_REL/accounts/source/palmID/$f"
-done
-
 echo ">> 3) sanity-check the payload actually carries our patches"
 grep -q "updateCompletePage" "$BUILD/data/$STAGE_REL/app/FirstUse.js"
 grep -q "WOSA" "$BUILD/data/$STAGE_REL/app/source/tnc/Palm.js"
@@ -64,8 +58,6 @@ grep -q "\"visible\": true" "$BUILD/data/$STAGE_REL/app/resources/en/appinfo.jso
 grep -q "accountUsername" "$BUILD/data/$STAGE_REL/service/GetTokenCommandAssistant.js"
 grep -q "updateUsername" "$BUILD/data/$STAGE_REL/service/services.json"
 grep -q "UpdateUsernameCommandAssistant" "$BUILD/data/$STAGE_REL/service/sources.json"
-grep -q "usernameLabel" "$BUILD/data/$STAGE_REL/accounts/source/palmID/ProfileSettings.js"
-grep -q "UsernameDialog" "$BUILD/data/$STAGE_REL/accounts/depends.js"
 echo "   ok"
 
 echo ">> 4) assemble ipk"

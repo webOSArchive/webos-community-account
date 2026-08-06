@@ -5,7 +5,6 @@
 
 APPID=com.palm.app.webosaccount
 SVC=/usr/palm/services/com.palm.service.palmprofile
-ACC=/usr/palm/applications/com.palm.app.accounts
 
 mount -o remount,rw / || exit 0
 
@@ -18,15 +17,6 @@ done
 # services.json/sources.json restore above, or the service would try to load a
 # file that is no longer there.
 rm -f "$SVC/handlers/UpdateUsernameCommandAssistant.js"
-
-# The stock Accounts app goes back to HP's version (profile editor dead again,
-# which is what it was before us).
-for f in depends.js source/palmID/ProfileSettings.js source/palmID/PalmIDUtilities.js source/palmID/PasswdDialog.js; do
-    if [ -f "$ACC/$f.stock" ]; then
-        cp "$ACC/$f.stock" "$ACC/$f"
-    fi
-done
-rm -f "$ACC/source/palmID/UsernameDialog.js"
 
 rm -rf "/usr/palm/applications/$APPID"
 kill $(ps | grep "[c]om.palm.service.palmprofile" | awk '{print $1}') >/dev/null 2>&1 || true

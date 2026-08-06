@@ -4,9 +4,9 @@
 # Run from anywhere; paths resolve relative to this script.
 #
 # What it does:
-#   1. Patches the on-device palmprofile SERVICE -> our catalog backend (redirect + skip-LCN login),
-#      adds the username surface (getAccountToken publishes it; updateUsername sets it),
-#      and patches the stock Accounts settings app so its profile editor works.
+#   1. Patches the on-device palmprofile SERVICE -> our catalog backend (redirect + skip-LCN login)
+#      and adds the username surface (getAccountToken publishes it; updateUsername sets it).
+#      The Accounts settings APP is no longer handled here - see the note at step 1c.
 #   2. Builds our optional account app com.palm.app.webosaccount from a neutered firstuse clone.
 #   3. Registers it (rescan). Then launch it to sign in.
 set -e
@@ -14,7 +14,6 @@ HERE="$(cd "$(dirname "$0")/.." && pwd)"      # webos/
 PATCHES="$HERE/patches"; APP="$HERE/app"
 
 SVC=/usr/palm/services/com.palm.service.palmprofile
-ACC=/usr/palm/applications/com.palm.app.accounts   # stock Accounts settings app
 FU=/usr/palm/applications/com.palm.app.firstuse
 APPID=com.palm.app.webosaccount
 APPDIR=/usr/palm/applications/$APPID
@@ -55,16 +54,17 @@ echo "  installed $SVC/handlers/UpdateUsernameCommandAssistant.js"
 # the service host starts — without this the new method is "unknown" until reboot.
 dev 'kill $(ps | grep "[c]om.palm.service.palmprofile" | awk "{print \$1}") 2>/dev/null; echo restarted'
 
-echo ">> 1c) patch the Accounts settings app (profile editor + username row)"
-# The stock Accounts app's profile editor (source/palmID) was dead: its entry
-# call, getAggregatedAccountInfo, had no backend. device.php now answers it, and
-# these put the username where HP had the security question.
-apply "$ACC/depends.js"                       "$PATCHES/accounts-depends.js.patch"
-apply "$ACC/source/palmID/ProfileSettings.js" "$PATCHES/accounts-ProfileSettings.js.patch"
-apply "$ACC/source/palmID/PalmIDUtilities.js" "$PATCHES/accounts-PalmIDUtilities.js.patch"
-apply "$ACC/source/palmID/PasswdDialog.js"    "$PATCHES/accounts-PasswdDialog.js.patch"
-novacom put "file://$ACC/source/palmID/UsernameDialog.js" < "$APP/accounts/UsernameDialog.js"
-echo "  installed $ACC/source/palmID/UsernameDialog.js"
+# NOTE: the Accounts settings app (com.palm.app.accounts) is no longer patched here.
+# Its profile editor was dead because getAggregatedAccountInfo had no backend; device.php
+# answers it now, and the app-side work (profile editor, username row, bug fixes) lives in
+# the webOS-ports core-apps repo instead of as diffs against HP's 3.0.5 binary:
+#
+#     https://github.com/webOSArchive/webos-core-apps   com.palm.app.accounts
+#
+# That tree is LG's Apache-2.0 release of the same app, so it can be shared as source
+# rather than patches, and it is where the consolidated effort with Herrie happens.
+# Deploy it from there (see that repo), not from here. The old accounts-*.patch files were
+# written against the HP binary and will NOT apply to the LG tree — removed, see git history.
 
 echo ">> 2) build app: clone firstuse -> $APPID"
 dev "rm -rf $APPDIR && cp -r $FU $APPDIR && echo cloned"

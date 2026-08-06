@@ -26,7 +26,7 @@ webos/
 │   ├── FirstUse.js.patch                    # app: neuter erase/OTA/shutdown/powerdown; confirm page + Done
 │   ├── Signin.js.patch                      # app: skip hanging PostSignIn OTA/backup checks
 │   ├── Palm.js.patch                        # app: terms card -> our TOS endpoint (skip dead LCN lookup)
-│   └── accounts-*.patch                     # the STOCK Accounts settings app — see "Accounts app" below
+│                                            # (the Accounts settings APP is not patched here — see below)
 ├── service/
 │   └── UpdateUsernameCommandAssistant.js    # ours, not HP's: palm://com.palm.accountservices/updateUsername
 ├── app/
@@ -35,7 +35,7 @@ webos/
 │   ├── Updater-Helper.js            # vendored from webosarchive/webos-common (Enyo) — self-update
 │   │                                # via the Museum entry "webOS Community Account Manager"
 │   │                                # (Launcher icon = firstuse's own icon; the clone keeps it)
-│   └── accounts/UsernameDialog.js   # new kind for the stock Accounts app's Username row
+│                                    # (the Accounts app's Username row lives in webos-core-apps)
 ├── ipk/
 │   ├── postinst                     # run by Preware/ipkgservice as root: app -> rootfs, patch service
 │   └── prerm                        # uninstall: restore <file>.stock service files, remove app
@@ -136,8 +136,16 @@ Services."* That message is a red herring; the network was always fine.
 Almost all of the fix is **server-side** — those assistants are stock and already
 post through our patched transport, so `device.php` just had to answer them
 (`getAccountInfoAggregate`, `isUserValid`, `updateAccountInfo`,
-`changeEmailAddress`, `changePassword`, `assignDeviceName`). The patches here are
-only for what the UI itself had to change:
+`changeEmailAddress`, `changePassword`, `assignDeviceName`).
+
+> **The app-side work is not in this repo.** It lives as source in
+> [webOSArchive/webos-core-apps](https://github.com/webOSArchive/webos-core-apps)
+> under `com.palm.app.accounts`, which is LG's Apache-2.0 release of the same app
+> — shareable as source instead of as diffs against HP's binary, and the base
+> Herrie is already building on, so the two efforts converge there rather than
+> forking. This repo still owns everything on the **service** side below.
+
+What changed on the app side:
 
 - **Username instead of security question.** We store no security answers, so
   that row now edits the account's **username**. Accounts are created with the
