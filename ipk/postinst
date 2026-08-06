@@ -29,8 +29,14 @@ for f in utils/palm_profile_util.js handlers/LoginProfileCommandAssistant.js han
     fi
     cp "$STAGE/service/$(basename "$f")" "$SVC/$f" || exit 1
 done
-# Purely ours — no stock file to preserve, so prerm deletes it outright.
-cp "$STAGE/service/UpdateUsernameCommandAssistant.js" "$SVC/handlers/UpdateUsernameCommandAssistant.js" || exit 1
+# Purely ours — no stock file to preserve, so prerm deletes them outright. These
+# three are ALSO named in sources.json above, which the service reads at process
+# start; shipping the manifest entry without the file it points at is what broke
+# a from-scratch install (services.json/sources.json copied fine, these did not,
+# and the service had no handler for methods its own manifest declared).
+for a in UpdateUsernameCommandAssistant SyncDeviceNameCommandAssistant SignOutCommandAssistant; do
+    cp "$STAGE/service/$a.js" "$SVC/handlers/$a.js" || exit 1
+done
 
 # 2) the app itself
 rm -rf "/usr/palm/applications/$APPID"
