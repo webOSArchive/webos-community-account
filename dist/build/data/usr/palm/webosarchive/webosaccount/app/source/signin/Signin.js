@@ -376,7 +376,12 @@ enyo.kind({
 				{name: "authFromChallengeQuestion", method: "authenticateAccountFromSecurityQuestion", onSuccess: "authFromChallengeQuestionSuccess", onFailure: "authFromChallengeQuestionFailure"},
 				{name: "changePassword", method: "changePassword", onSuccess: "changePasswordSuccess", onFailure: "changePasswordFailure"},
 				{name: "requestPasswordResetEmail", method: "requestPasswordResetEmail", onSuccess: "requestPasswordResetEmailSuccess", onFailure: "requestPasswordResetEmailFailure"},
-				{name: "isEmailAvailable", method: "isEmailAvailable", onSuccess:"isEmailAvailableSuccess", onFailure:"isEmailAvailableFailure"}
+				{name: "isEmailAvailable", method: "isEmailAvailable", onSuccess:"isEmailAvailableSuccess", onFailure:"isEmailAvailableFailure"},
+				// webOS Archive: push this device's own name up to the account after
+				// sign-in, so the account's device list shows something recognisable
+				// instead of a hardware SKU. onResponse (not onSuccess/onFailure) — it is
+				// best-effort and must not branch the sign-in flow either way.
+				{name: "syncDeviceName", method: "syncDeviceName", onResponse: "syncDeviceNameResponse"}
 			]	
 		},
 		
@@ -1980,6 +1985,10 @@ enyo.kind({
 		this.$.createAnswer.forceBlur();
 	},
 	
+	syncDeviceNameResponse: function(inSender, inResponse) {
+		console.info("WOSA: device name sync: " + JSON.stringify(inResponse));
+	},
+
 	doPostSignInChecks: function(){
 		// webOS Archive: skip the stock post-sign-in checks. PostSignIn runs an OTA
 		// software-update check (no update service exists -> hangs) and a backup-devices
@@ -1988,6 +1997,10 @@ enyo.kind({
 		console.info("WOSA: skipping PostSignIn OTA/backup checks — finishing sign-in.");
 		this.$.scrim.hide();
 		this.$.spinner.setShowing(false);
+		// The account + token are already in db8 by this point (both the sign-in and
+		// the create path land here), which is what syncDeviceName reads, so this is
+		// the earliest safe place to publish the device name.
+		this.$.syncDeviceName.call({});
 		this.doFinish();
 	},
 	

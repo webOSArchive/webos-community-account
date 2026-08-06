@@ -8,13 +8,18 @@ SVC=/usr/palm/services/com.palm.service.palmprofile
 
 mount -o remount,rw / || exit 0
 
-for f in utils/palm_profile_util.js handlers/LoginProfileCommandAssistant.js handlers/IsEmailAvailableCommandAssistant.js handlers/GetTermsAndConditionsCommandAssistant.js; do
+for f in utils/palm_profile_util.js handlers/LoginProfileCommandAssistant.js handlers/IsEmailAvailableCommandAssistant.js handlers/GetTermsAndConditionsCommandAssistant.js handlers/GetTokenCommandAssistant.js services.json sources.json; do
     if [ -f "$SVC/$f.stock" ]; then
         cp "$SVC/$f.stock" "$SVC/$f"
     fi
 done
+# Ours, never HP's — remove rather than restore. Must go together with the
+# services.json/sources.json restore above, or the service would try to load a
+# file that is no longer there.
+rm -f "$SVC/handlers/UpdateUsernameCommandAssistant.js"
 
 rm -rf "/usr/palm/applications/$APPID"
+kill $(ps | grep "[c]om.palm.service.palmprofile" | awk '{print $1}') >/dev/null 2>&1 || true
 luna-send -n 1 palm://com.palm.applicationManager/rescan '{}' >/dev/null 2>&1 || true
 
 exit 0

@@ -17,6 +17,10 @@ SVC=/usr/palm/services/com.palm.service.palmprofile
 FU=/usr/palm/applications/com.palm.app.firstuse
 APPID=com.palm.app.webosaccount
 APPDIR=/usr/palm/applications/$APPID
+# Single source of truth for the version: app/appinfo.json. package.sh reads the
+# same file for the ipk's Version, so the installed app and the package can never
+# disagree — which matters because the self-updater compares the two.
+VERSION=$(sed -n 's/.*"version": *"\([^"]*\)".*/\1/p' "$APP/appinfo.json" | head -1)
 
 # dev '<shell>' : run a command on the device (pushed script — novacom `sh -c` is unreliable)
 dev() { printf '%s\n' "$1" > /tmp/_dev.sh; novacom put file:///tmp/_dev.sh < /tmp/_dev.sh >/dev/null; novacom run file:///bin/sh -- /tmp/_dev.sh; }
@@ -82,7 +86,10 @@ dev "sed -i 's|\"config.js\",|\"config.js\",\\n\t\"Updater-Helper.js\",|' $APPDI
 # CRITICAL: localized resources/<locale>/appinfo.json each carry the id and OVERRIDE the base.
 # The id MUST start with com.palm. (webOS grants privileged calls by prefix) — set it everywhere.
 # They also carry visible:false (firstuse is hidden) — flip it so the app gets a Launcher icon.
-dev "for f in \$(find $APPDIR/resources -name appinfo.json); do sed -i 's/com\\.palm\\.app\\.firstuse/$APPID/g; s/HP webOS/webOS Account/g; s/\"visible\": false/\"visible\": true/g; s/\"vendor\": \"HP\"/\"vendor\": \"webOS Archive\"/g; s/\"version\": \"3.0.0\"/\"version\": \"1.0.0\"/g' \"\$f\"; done; echo reid-done"
+# And the VERSION: matching any value rather than firstuse's literal 3.0.0, so a bump in
+# app/appinfo.json reaches the locale files too. Miss this and the base says the new version
+# while every locale override still says the old one — and the override is what wins.
+dev "for f in \$(find $APPDIR/resources -name appinfo.json); do sed -i 's/com\\.palm\\.app\\.firstuse/$APPID/g; s/HP webOS/webOS Account/g; s/\"visible\": false/\"visible\": true/g; s/\"vendor\": \"HP\"/\"vendor\": \"webOS Archive\"/g; s/\"version\": \"[^\"]*\"/\"version\": \"$VERSION\"/g' \"\$f\"; done; echo reid-done"
 
 echo ">> 3) register (rescan)"
 dev 'luna-send -n 1 palm://com.palm.applicationManager/rescan "{}"'

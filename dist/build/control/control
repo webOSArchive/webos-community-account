@@ -1,9 +1,9 @@
 Package: org.webosarchive.webosaccount
-Version: 1.0.0
+Version: 1.1.0
 Section: misc
 Priority: optional
 Architecture: all
 Maintainer: webOS Archive <webmaster@webosarchive.org>
 Description: webOS Community Account Manager
-Source: {"Type": "Application", "Title": "webOS Account", "FullDescription": "Optional community account setup. Signed-in account becomes your device profile, and will be used for App Catalog features. Installs a small patch redirecting the long-dead HP account service to the community backend (original files are preserved and restored on uninstall), over-writing the Dr. Skipped First Use with a more useful account."}
+Source: {"Type": "Application", "Title": "webOS Account", "FullDescription": "Optional community account setup. Sign in with your webOS Archive account and it becomes this device's profile, unlocking App Catalog features and cloud app storage. Manage the account afterwards from Settings > Accounts: change your name, email, password, pick a public username, see which devices are on the account, and sign out. Installs a small patch redirecting the long-dead HP account service to the community backend (original files are preserved and restored on uninstall), over-writing the Dr. Skipped First Use with a more useful account."}
 webOS-Package-Format-Version: 2

@@ -60,7 +60,17 @@ grep -q "\"visible\": true" "$BUILD/data/$STAGE_REL/app/resources/en/appinfo.jso
 grep -q "accountUsername" "$BUILD/data/$STAGE_REL/service/GetTokenCommandAssistant.js"
 grep -q "updateUsername" "$BUILD/data/$STAGE_REL/service/services.json"
 grep -q "UpdateUsernameCommandAssistant" "$BUILD/data/$STAGE_REL/service/sources.json"
-echo "   ok"
+grep -q "syncDeviceName" "$BUILD/data/$STAGE_REL/service/services.json"
+grep -q "signOut" "$BUILD/data/$STAGE_REL/service/services.json"
+# The localized appinfo files OVERRIDE the base, so a version that only got bumped
+# in the base ships an app that reports the OLD version while the ipk claims the new
+# one — and the self-updater compares exactly those two. Fail the build instead.
+for f in "$BUILD/data/$STAGE_REL/app/resources"/*/appinfo.json "$BUILD/data/$STAGE_REL/app/resources"/*/*/appinfo.json; do
+    [ -f "$f" ] || continue
+    grep -q "\"version\": \"$VERSION\"" "$f" || {
+        echo "!! $f does not carry version $VERSION — locale override would win" >&2; exit 1; }
+done
+echo "   ok (version $VERSION consistent across base + $(ls -d "$BUILD/data/$STAGE_REL/app/resources"/*/ 2>/dev/null | wc -l | tr -d ' ') locale dirs)"
 
 echo ">> 4) assemble ipk"
 mkdir -p "$BUILD/control"
@@ -72,7 +82,7 @@ Priority: optional
 Architecture: all
 Maintainer: webOS Archive <webmaster@webosarchive.org>
 Description: webOS Community Account Manager
-Source: {"Type": "Application", "Title": "webOS Account", "FullDescription": "Optional community account setup. Signed-in account becomes your device profile, and will be used for App Catalog features. Installs a small patch redirecting the long-dead HP account service to the community backend (original files are preserved and restored on uninstall), over-writing the Dr. Skipped First Use with a more useful account."}
+Source: {"Type": "Application", "Title": "webOS Account", "FullDescription": "Optional community account setup. Sign in with your webOS Archive account and it becomes this device's profile, unlocking App Catalog features and cloud app storage. Manage the account afterwards from Settings > Accounts: change your name, email, password, pick a public username, see which devices are on the account, and sign out. Installs a small patch redirecting the long-dead HP account service to the community backend (original files are preserved and restored on uninstall), over-writing the Dr. Skipped First Use with a more useful account."}
 webOS-Package-Format-Version: 2
 EOF
 cp "$HERE/ipk/postinst" "$HERE/ipk/prerm" "$BUILD/control/"

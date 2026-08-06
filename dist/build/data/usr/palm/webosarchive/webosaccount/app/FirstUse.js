@@ -73,8 +73,13 @@ enyo.kind({
 					{kind: "Control", layoutKind: "VFlexLayout", align:'center', className:"contentDefaults", pack: 'justify', components: [
 						{name: "completeSetup", content: rb.$L("Thanks!"), className: "title"},
 						{name: "completeSubtitle", content: rb.$L("Your webOS Account is ready to use."), className: "subtitle"},
+						// webOS Archive: this card is reached both at the end of sign-in and on
+						// a relaunch that finds an account already set up, so it points at the
+						// place that can actually do something with the account either way.
+						{name: "wosaManageHint", content: rb.$L("Use the Accounts app to manage your account."), className: "subtitle", style: "margin-top: 12px;"},
 						{kind: "SpinnerLarge", name: "spinner", showing: false},
 						{name: "completeDone", kind: "Button", caption: rb.$L("Done"), className: "enyo-button", style: "width: 220px; margin-top: 24px;", onclick: "completeDoneTap"},
+						{name: "wosaLaunchAccounts", kind: "Button", caption: rb.$L("Launch Accounts"), className: "enyo-button", style: "width: 220px; margin-top: 12px;", onclick: "wosaLaunchAccountsTap"},
 					]}
 				]}
 			]}
@@ -202,9 +207,14 @@ enyo.kind({
 			    {name: "setTimeZoneFromIP", method: "setTimeZoneFromIP", onResponse:"postTimeZoneResponse"},
 			    {name: "assignDeviceName", method: "assignDeviceName", onSuccess: "assignDeviceNameSuccess", onFailure: "assignDeviceNameFailure"},
 			    {name: "getToken", method: "getAccountToken", onResponse: "getTokenResponse"},
+			    // webOS Archive: launch-time "is there already an account?" probe. Separate
+			    // from getToken above, whose handler drives the completion page.
+			    {name: "wosaExistingAccount", method: "getAccountToken", onResponse: "wosaExistingAccountResponse"},
 			]	
 		},
 		
+		{name: "wosaLaunchApp", kind: "PalmService", service: "palm://com.palm.applicationManager/", method: "launch"},
+
 		{kind: "DeviceProfileService", onFailure: "handleGenericFailure", onSuccess: "handleGenericSuccess",
 			components:[
 				{name: "getDevice", method: "getDeviceProfile", onResponse: "getDeviceResponse"},
@@ -298,6 +308,8 @@ enyo.kind({
 	
 	create: function() {
 	    
+		this.wosaStarted = false;
+		this.wosaStartTimer = null;
 		this.assignDeviceNameRetry = false;
 		this.pluggedInStatusChangedInited = false;
 		this.log(typeof(inLocale));
@@ -316,9 +328,88 @@ enyo.kind({
 		{
 			enyo.application.FirstUse = this;
 		}
-		this.start();
+		// webOS Archive: once an account exists this app has nothing left to offer —
+		// walking the user back through terms + sign-in is just confusing. Probe for
+		// an account first and hand off to the Accounts app if there is one.
+		this.wosaCheckForExistingAccount();
+	},
 
-		// webOS Archive: check the App Museum for a newer build of this app.
+	// Decide whether to run the setup flow at all. Launch with {"forceSignIn":true}
+	// to skip the check — that is how you sign in as a DIFFERENT account, since the
+	// sign-in flow is the only thing that can replace the device's account.
+	wosaCheckForExistingAccount: function() {
+		var params = null;
+		try {
+			params = (window.PalmSystem && PalmSystem.launchParams)
+				? enyo.json.parse(PalmSystem.launchParams) : null;
+		} catch (e) {
+			console.info("WOSA: launchParams parse error: " + e);
+		}
+		if (params && params.forceSignIn) {
+			console.info("WOSA: forceSignIn — running setup even though an account may exist.");
+			this.wosaStartSetup();
+			return;
+		}
+		// Never leave the app showing nothing: if the probe does not answer, run
+		// setup anyway. getAccountToken is a local db8 read, so this should not fire.
+		this.wosaStartTimer = setTimeout(enyo.bind(this, "wosaStartSetup"), 4000);
+		this.$.wosaExistingAccount.call({});
+	},
+
+	wosaExistingAccountResponse: function(inSender, inResponse) {
+		if (inResponse && inResponse.returnValue && inResponse.token) {
+			console.info("WOSA: account already set up — showing the signed-in card.");
+			this.wosaStarted = true;   // suppress the timer fallback
+			this.wosaShowAlreadySignedIn(inResponse);
+			return;
+		}
+		console.info("WOSA: no account yet — running setup.");
+		this.wosaStartSetup();
+	},
+
+	// Land on the completion card rather than running the setup flow: there is
+	// nothing to set up, and walking the user through terms + sign-in again is the
+	// whole problem. Deliberately does NOT call start(), which would kick off the
+	// scene machinery and select the terms card out from under this one.
+	//
+	// Same card, same copy as the end of sign-in — the only difference is how you
+	// got here, which is not something the user needs told twice.
+	wosaShowAlreadySignedIn: function(inResponse) {
+		// Seed what updateCompletePage() reads, so the card can name the account on
+		// this path too; after sign-in these are already set.
+		this.setAcctAlias(inResponse.accountAlias);
+		this.setAcctToken(inResponse.token);
+		this.updateCompletePage();
+
+		// selectViewByName alone is not enough: the card is declared showing:false,
+		// so it also has to be shown explicitly. Both of the paths that already
+		// reach this card (completeFirstUse, performSoftwareUpdate) do exactly
+		// this pair — without the show() you get the background and nothing else.
+		this.$.pane.selectViewByName("complete");
+		this.$.complete.show();
+
+		// The update check lives in start(), which we just skipped — run it here so
+		// this app can still find its own updates from the path most people hit.
+		this.wosaCheckForUpdates();
+	},
+
+	wosaLaunchAccountsTap: function() {
+		this.$.wosaLaunchApp.call({id: "com.palm.app.accounts"});
+		this.closeApp();
+	},
+
+	// Runs at most once, from whichever of the two paths gets here first.
+	wosaStartSetup: function() {
+		if (this.wosaStarted) { return; }
+		this.wosaStarted = true;
+		if (this.wosaStartTimer) { clearTimeout(this.wosaStartTimer); this.wosaStartTimer = null; }
+
+		this.start();
+		this.wosaCheckForUpdates();
+	},
+
+	// webOS Archive: check the App Museum for a newer build of this app.
+	wosaCheckForUpdates: function() {
 		try {
 			// firstuse's stylesheet paints text white (dark theme); the updater's
 			// popup is light-backed — force readable text without editing the

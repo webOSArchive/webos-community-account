@@ -240,7 +240,15 @@ var Util = Class.create ({
 		var token = new PalmProfile();
 		
 		token.alias = authenticateInfo.accountAlias;
-		
+
+		// webOS Archive: the member's public handle, kept in the local profile so
+		// any app can read it from getAccountToken without a network round trip.
+		// Guarded: an older backend omits it, and writing undefined would blank
+		// a username the device already knows.
+		if (authenticateInfo.accountUsername) {
+			token.username = authenticateInfo.accountUsername;
+		}
+
 		token.authenticatedTime = authenticateInfo.authenticationTime;
 		token.tokenexpireTime = authenticateInfo.expirationTime;
 		token.state = authenticateInfo.accountState;
