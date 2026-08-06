@@ -13,15 +13,20 @@
  		first: true,
  		createProfile: false,
  		firstName: "",
-@@ -72,14 +72,20 @@
+@@ -72,14 +72,25 @@
  				{kind: "VFlexBox", align: "center", components: [
  					{kind: "Control", layoutKind: "VFlexLayout", align:'center', className:"contentDefaults", pack: 'justify', components: [
  						{name: "completeSetup", content: rb.$L("Thanks!"), className: "title"},
 -						{content: rb.$L("We're almost done. When we finish, we'll restart your device and you'll be ready to go."), className: "subtitle"},
 -						{kind: "SpinnerLarge", name: "spinner", showing: true},
 +						{name: "completeSubtitle", content: rb.$L("Your webOS Account is ready to use."), className: "subtitle"},
++						// webOS Archive: this card is reached both at the end of sign-in and on
++						// a relaunch that finds an account already set up, so it points at the
++						// place that can actually do something with the account either way.
++						{name: "wosaManageHint", content: rb.$L("Use the Accounts app to manage your account."), className: "subtitle", style: "margin-top: 12px;"},
 +						{kind: "SpinnerLarge", name: "spinner", showing: false},
 +						{name: "completeDone", kind: "Button", caption: rb.$L("Done"), className: "enyo-button", style: "width: 220px; margin-top: 24px;", onclick: "completeDoneTap"},
++						{name: "wosaLaunchAccounts", kind: "Button", caption: rb.$L("Launch Accounts"), className: "enyo-button", style: "width: 220px; margin-top: 12px;", onclick: "wosaLaunchAccountsTap"},
  					]}
  				]}
  			]}
@@ -36,7 +41,7 @@
  		
  		{name: "SimStatusQuery", kind: "TelephonyService", method: "simStatusQuery",subscribe: true, onSuccess: "handleSimStatusQuery"},
  		{name: "PlatformQuery", kind: "TelephonyService", method: "platformQuery",subscribe: false, onSuccess: "handlePlatformQuery", onFailure: "handlePlatformQueryFail"},
-@@ -196,9 +202,14 @@
+@@ -196,9 +207,14 @@
  			    {name: "setTimeZoneFromIP", method: "setTimeZoneFromIP", onResponse:"postTimeZoneResponse"},
  			    {name: "assignDeviceName", method: "assignDeviceName", onSuccess: "assignDeviceNameSuccess", onFailure: "assignDeviceNameFailure"},
  			    {name: "getToken", method: "getAccountToken", onResponse: "getTokenResponse"},
@@ -51,7 +56,7 @@
  		{kind: "DeviceProfileService", onFailure: "handleGenericFailure", onSuccess: "handleGenericSuccess",
  			components:[
  				{name: "getDevice", method: "getDeviceProfile", onResponse: "getDeviceResponse"},
-@@ -292,6 +303,8 @@
+@@ -292,6 +308,8 @@
  	
  	create: function() {
  	    
@@ -60,7 +65,7 @@
  		this.assignDeviceNameRetry = false;
  		this.pluggedInStatusChangedInited = false;
  		this.log(typeof(inLocale));
-@@ -309,8 +322,65 @@
+@@ -309,9 +327,94 @@
  		if (enyo.application.FirstUse === undefined)
  		{
  			enyo.application.FirstUse = this;
@@ -95,14 +100,39 @@
 +
 +	wosaExistingAccountResponse: function(inSender, inResponse) {
 +		if (inResponse && inResponse.returnValue && inResponse.token) {
-+			console.info("WOSA: account already set up — handing off to the Accounts app.");
++			console.info("WOSA: account already set up — showing the signed-in card.");
 +			this.wosaStarted = true;   // suppress the timer fallback
-+			this.$.wosaLaunchApp.call({id: "com.palm.app.accounts"});
-+			this.closeApp();
++			this.wosaShowAlreadySignedIn(inResponse);
 +			return;
 +		}
 +		console.info("WOSA: no account yet — running setup.");
 +		this.wosaStartSetup();
++	},
++
++	// Land on the completion card rather than running the setup flow: there is
++	// nothing to set up, and walking the user through terms + sign-in again is the
++	// whole problem. Deliberately does NOT call start(), which would kick off the
++	// scene machinery and select the terms card out from under this one.
++	//
++	// Same card, same copy as the end of sign-in — the only difference is how you
++	// got here, which is not something the user needs told twice.
++	wosaShowAlreadySignedIn: function(inResponse) {
++		// Seed what updateCompletePage() reads, so the card can name the account on
++		// this path too; after sign-in these are already set.
++		this.setAcctAlias(inResponse.accountAlias);
++		this.setAcctToken(inResponse.token);
++		this.updateCompletePage();
++
++		this.$.pane.selectViewByName("complete");
++		this.$.pane.flow();
++		// The update check lives in start(), which we just skipped — run it here so
++		// this app can still find its own updates from the path most people hit.
++		this.wosaCheckForUpdates();
++	},
++
++	wosaLaunchAccountsTap: function() {
++		this.$.wosaLaunchApp.call({id: "com.palm.app.accounts"});
++		this.closeApp();
 +	},
 +
 +	// Runs at most once, from whichever of the two paths gets here first.
@@ -112,8 +142,11 @@
 +		if (this.wosaStartTimer) { clearTimeout(this.wosaStartTimer); this.wosaStartTimer = null; }
 +
  		this.start();
++		this.wosaCheckForUpdates();
+ 	},
 +
-+		// webOS Archive: check the App Museum for a newer build of this app.
++	// webOS Archive: check the App Museum for a newer build of this app.
++	wosaCheckForUpdates: function() {
 +		try {
 +			// firstuse's stylesheet paints text white (dark theme); the updater's
 +			// popup is light-backed — force readable text without editing the
@@ -123,10 +156,11 @@
 +		} catch (e) {
 +			console.info("WOSA: update check failed to start: " + e);
 +		}
- 	},
++	},
  	
  	start: function() {
-@@ -378,17 +448,11 @@
+ 	    
+@@ -378,17 +481,11 @@
  
  	
  	getRestoreInProgressSuccess: function(inSender, inResponse) {
@@ -149,7 +183,7 @@
  	},
  	
  	getRestoreInProgressFailure: function() {
-@@ -828,20 +892,32 @@
+@@ -828,19 +925,31 @@
  	},
  	
  	done: function(){
@@ -175,24 +209,22 @@
 -			this.postTimeZoneResponseReturned = true; // we just pretend we called it in non-wifi mode other wise we hang.
 +			this.$.completeSubtitle.setContent("Your webOS Account is ready to use.");
  		}
--
++	},
+ 
 -		console.log("Set Customizations: " + this.countryCode + " : " + this.languageCode);
 -		this.$.setCustomization.call({"language":this.languageCode,"country":this.countryCode});
++	completeDoneTap: function(){
++		this.closeApp();
 +	},
  
 -		this.$.postLoginSettings.call();
 -		this.$.removeRestoreFailedFile.call();
-+	completeDoneTap: function(){
-+		this.closeApp();
- 	},
-+
 +	closeApp: function(){
 +		try { window.close(); } catch (e) { console.info("WOSA close err: " + e); }
-+	},
+ 	},
  	
  	postTimeZoneResponse: function(inSender, inResponse){
-         console.info("postTimeZoneResponse Call Returned");
-@@ -893,16 +969,10 @@
+@@ -893,16 +1002,10 @@
  	},
  	
  	firstUseComplete: function() {
@@ -213,7 +245,7 @@
  	},
  	
  	performSoftwareUpdate: function() {
-@@ -921,16 +991,8 @@
+@@ -921,16 +1024,8 @@
  	
      
      powerDownDevice: function () {
@@ -232,7 +264,7 @@
  	},
  	
  	powerDownResponse:function(inSender, inResponse){
-@@ -1029,8 +1091,9 @@
+@@ -1029,8 +1124,9 @@
  		if(inResponse.returnValue){
  			this.setAcctAlias(inResponse.accountAlias);
  			this.setAcctToken(inResponse.token);
