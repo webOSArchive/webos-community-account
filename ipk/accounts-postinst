@@ -1,0 +1,109 @@
+#!/bin/sh
+# Installer for the webOS Archive build of the stock Accounts app
+# (com.palm.app.accounts). Runs as ROOT via Preware / org.webosinternals.ipkgservice,
+# or as pmPostInstall.script under WebOSQuickInstall.
+#
+# This REPLACES a stock rootfs app, so it backs the original up first and prerm puts
+# it back. The payload ships as one tarball rather than ~50 loose files: ipkg's
+# per-file bookkeeping, not disk throughput, dominates an offline-root install.
+#
+# Why the state file, and not dest.txt from the staged payload: postinst deletes the
+# staged directory once applied (otherwise a later package's glob can find this stale
+# one and reinstall the wrong payload). Anything prerm needs must therefore live
+# somewhere postinst does NOT clean up — read the note in accounts-prerm.
+set +e
+
+APPID=com.palm.app.accounts
+DST=/usr/palm/applications/$APPID
+STATE=/media/cryptofs/webosarchive-accounts
+BAK="$STATE/stock-app.tar"
+MARKER="$STATE/installed"
+REL=media/cryptofs/webosarchive-accounts-overwrite
+
+# A file only our build has. Used to tell "this is stock" from "this is already
+# ours" — see the backup guard below. More robust than an md5, which changes with
+# every build of ours.
+OURS_MARKER="source/palmID/UsernameDialog.js"
+
+# This app is Enyo 1.0 built against webOS 3.0.x. The Accounts app on 2.x is a
+# different animal, and dropping this over it would break Settings > Accounts on a
+# device whose stock app we have never seen. Refuse before touching anything —
+# the same guard the OpenSSL-legacyWebOS packages use for vtable-sensitive binaries.
+EXPECT_OSVER_PREFIX=3.0
+
+log() { echo "[wosa-accounts] $*"; }
+
+mount -o remount,rw /dev/mapper/store-root / 2>/dev/null
+mount -o remount,rw / 2>/dev/null
+
+osv=$(sed -n 's/^PRODUCT_VERSION_STRING=.* \([0-9][0-9.]*\)$/\1/p' /etc/palm-build-info 2>/dev/null | head -1)
+case "$osv" in
+    "$EXPECT_OSVER_PREFIX"*) ;;
+    "") log "could not read the webOS version from /etc/palm-build-info — continuing" ;;
+    *)  echo "!! this package targets webOS $EXPECT_OSVER_PREFIX.x; this device reports $osv. Refusing to replace its Accounts app." >&2
+        exit 1 ;;
+esac
+
+mkdir -p "$STATE"
+
+# Preware installs with an offline root (ipkg -o /media/cryptofs/apps), so the payload
+# can land at either path. Confirmed live in the sibling core-apps packaging.
+OV=""
+for base in "/$REL" "/media/cryptofs/apps/$REL"; do
+    [ -f "$base/payload.tar.gz" ] && OV="$base" && break
+done
+
+if [ -z "$OV" ]; then
+    # WebOSQuickInstall runs this script a second time after the real install already
+    # consumed the payload. That is redundant, not a failure — provided we actually
+    # installed last time.
+    if [ -f "$MARKER" ] && [ -d "$DST" ]; then
+        log "nothing staged and $DST is present — already installed, treating as a no-op"
+        exit 0
+    fi
+    echo "!! no payload found at /$REL (checked offline-root too)" >&2
+    exit 1
+fi
+
+# Back up the app we are about to replace — but only if there is no backup already
+# AND what is sitting there is actually stock. Both halves matter: on a reinstall or
+# upgrade the app at $DST is OUR build, and capturing that as "stock" would lose the
+# only copy of the original and make prerm restore our build forever. The backup-once
+# check alone does not cover the case where the backup was deleted by hand.
+if [ -d "$DST" ] && [ ! -f "$BAK" ] && [ ! -f "$DST/$OURS_MARKER" ]; then
+    ( cd "$(dirname "$DST")" && tar cf "$BAK" "$(basename "$DST")" ) \
+        && log "backed up stock $DST -> $BAK"
+elif [ -f "$DST/$OURS_MARKER" ] && [ ! -f "$BAK" ]; then
+    log "WARNING: replacing our own build with no stock backup on file — uninstall will remove the app rather than restore stock"
+fi
+
+rm -rf "$DST"
+mkdir -p "$DST"
+tar -C "$DST" --no-same-owner -xzf "$OV/payload.tar.gz"
+TAR_STATUS=$?
+
+# Under `set +e` a truncated payload would otherwise be reported as a successful
+# install of an empty directory. Check tar's status AND that something arrived: a
+# truncated-but-gzip-valid archive can exit 0 with partial content.
+if [ "$TAR_STATUS" -ne 0 ] || [ -z "$(ls -A "$DST" 2>/dev/null)" ]; then
+    echo "!! extracting $OV/payload.tar.gz into $DST failed (tar exit $TAR_STATUS) — likely a truncated transfer" >&2
+    rm -rf "$DST"
+    if [ -f "$BAK" ]; then
+        ( cd "$(dirname "$DST")" && tar xf "$BAK" ) && log "rolled back to the backed-up app"
+    fi
+    exit 1
+fi
+
+# Written AFTER a verified extraction and never cleaned up: this is what tells prerm
+# there is something to undo, and it has to outlive the staged payload below.
+echo "$DST" > "$MARKER"
+log "installed $DST"
+
+rm -rf "$OV"
+
+luna-send -n 1 palm://com.palm.applicationManager/rescan '{}' >/dev/null 2>&1
+log "install complete. Restart the UI to pick up the new app JS: stop LunaSysMgr; start LunaSysMgr"
+
+# Deliberately NOT remounting root read-only: ipkg writes its own bookkeeping after
+# postinst returns, and that needs a writable root.
+exit 0
