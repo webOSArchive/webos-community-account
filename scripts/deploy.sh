@@ -48,7 +48,7 @@ echo ">> 1b) palmprofile: publish the account username + add updateUsername"
 apply "$SVC/handlers/GetTokenCommandAssistant.js"         "$PATCHES/GetTokenCommandAssistant.js.patch"
 apply "$SVC/services.json"                                "$PATCHES/services.json.patch"
 apply "$SVC/sources.json"                                 "$PATCHES/sources.json.patch"
-for a in UpdateUsernameCommandAssistant SyncDeviceNameCommandAssistant; do
+for a in UpdateUsernameCommandAssistant SyncDeviceNameCommandAssistant SignOutCommandAssistant; do
   novacom put "file://$SVC/handlers/$a.js" < "$HERE/service/$a.js"
   echo "  installed $SVC/handlers/$a.js"
 done

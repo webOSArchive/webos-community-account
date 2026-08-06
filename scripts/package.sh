@@ -46,6 +46,8 @@ novacom run file:///bin/cat -- "$SVC/handlers/GetTermsAndConditionsCommandAssist
 # two manifests are what make the new method exist on the bus at all.
 novacom run file:///bin/cat -- "$SVC/handlers/GetTokenCommandAssistant.js"         > "$BUILD/data/$STAGE_REL/service/GetTokenCommandAssistant.js"
 novacom run file:///bin/cat -- "$SVC/handlers/UpdateUsernameCommandAssistant.js"   > "$BUILD/data/$STAGE_REL/service/UpdateUsernameCommandAssistant.js"
+novacom run file:///bin/cat -- "$SVC/handlers/SyncDeviceNameCommandAssistant.js"   > "$BUILD/data/$STAGE_REL/service/SyncDeviceNameCommandAssistant.js"
+novacom run file:///bin/cat -- "$SVC/handlers/SignOutCommandAssistant.js"         > "$BUILD/data/$STAGE_REL/service/SignOutCommandAssistant.js"
 novacom run file:///bin/cat -- "$SVC/services.json"                                > "$BUILD/data/$STAGE_REL/service/services.json"
 novacom run file:///bin/cat -- "$SVC/sources.json"                                 > "$BUILD/data/$STAGE_REL/service/sources.json"
 

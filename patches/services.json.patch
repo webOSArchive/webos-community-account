@@ -1,6 +1,6 @@
 --- com.palm.service.palmprofile/services.json
 +++ com.palm.service.palmprofile/services.json
-@@ -137,11 +137,19 @@
+@@ -137,11 +137,23 @@
  				    "name": "setTimeZoneFromIP",
  				    "assistant": "SetTimeZoneFromIP"
  				},
@@ -16,6 +16,10 @@
 +				{
 +					"name": "syncDeviceName",
 +					"assistant": "SyncDeviceNameCommandAssistant"
++				},
++				{
++					"name": "signOut",
++					"assistant": "SignOutCommandAssistant"
  				}
 -				
 +

@@ -1,6 +1,6 @@
 --- com.palm.service.palmprofile/sources.json
 +++ com.palm.service.palmprofile/sources.json
-@@ -40,6 +40,8 @@
+@@ -40,6 +40,9 @@
  	{ "source": "handlers/GetLocalProfileAssistant.js" },
  	{ "source": "handlers/DissociateDeviceAssistant.js" },
  	{ "source": "handlers/SetTimeZoneFromIP.js" },
@@ -8,6 +8,7 @@
 -	
 +	{ "source": "handlers/AssignDeviceNameNoAcctInfoArgsCommandAssistant.js" },
 +	{ "source": "handlers/UpdateUsernameCommandAssistant.js" },
-+	{ "source": "handlers/SyncDeviceNameCommandAssistant.js" }
++	{ "source": "handlers/SyncDeviceNameCommandAssistant.js" },
++	{ "source": "handlers/SignOutCommandAssistant.js" }
 +
  ]
