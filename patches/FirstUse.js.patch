@@ -65,7 +65,7 @@
  		this.assignDeviceNameRetry = false;
  		this.pluggedInStatusChangedInited = false;
  		this.log(typeof(inLocale));
-@@ -309,9 +327,94 @@
+@@ -309,9 +327,99 @@
  		if (enyo.application.FirstUse === undefined)
  		{
  			enyo.application.FirstUse = this;
@@ -123,8 +123,13 @@
 +		this.setAcctToken(inResponse.token);
 +		this.updateCompletePage();
 +
++		// selectViewByName alone is not enough: the card is declared showing:false,
++		// so it also has to be shown explicitly. Both of the paths that already
++		// reach this card (completeFirstUse, performSoftwareUpdate) do exactly
++		// this pair — without the show() you get the background and nothing else.
 +		this.$.pane.selectViewByName("complete");
-+		this.$.pane.flow();
++		this.$.complete.show();
++
 +		// The update check lives in start(), which we just skipped — run it here so
 +		// this app can still find its own updates from the path most people hit.
 +		this.wosaCheckForUpdates();
@@ -160,7 +165,7 @@
  	
  	start: function() {
  	    
-@@ -378,17 +481,11 @@
+@@ -378,17 +486,11 @@
  
  	
  	getRestoreInProgressSuccess: function(inSender, inResponse) {
@@ -183,7 +188,7 @@
  	},
  	
  	getRestoreInProgressFailure: function() {
-@@ -828,19 +925,31 @@
+@@ -828,19 +930,31 @@
  	},
  	
  	done: function(){
@@ -224,7 +229,7 @@
  	},
  	
  	postTimeZoneResponse: function(inSender, inResponse){
-@@ -893,16 +1002,10 @@
+@@ -893,16 +1007,10 @@
  	},
  	
  	firstUseComplete: function() {
@@ -245,7 +250,7 @@
  	},
  	
  	performSoftwareUpdate: function() {
-@@ -921,16 +1024,8 @@
+@@ -921,16 +1029,8 @@
  	
      
      powerDownDevice: function () {
@@ -264,7 +269,7 @@
  	},
  	
  	powerDownResponse:function(inSender, inResponse){
-@@ -1029,8 +1124,9 @@
+@@ -1029,8 +1129,9 @@
  		if(inResponse.returnValue){
  			this.setAcctAlias(inResponse.accountAlias);
  			this.setAcctToken(inResponse.token);
