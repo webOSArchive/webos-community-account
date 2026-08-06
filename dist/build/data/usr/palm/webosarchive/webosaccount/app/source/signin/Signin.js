@@ -76,6 +76,13 @@ label_error_invalidSignInEmailText = rb.$L("Please enter a valid email address."
 label_error_invalidSignInPassword = rb.$L("The password you entered is incorrect. Try again.");
 label_error_noProfileFoundText = rb.$L("We couldn't find a webOS account associated with that email address.");
 label_error_unableToSignInText = rb.$L("We were unable to sign you in. Please try again in a few minutes. If the problem continues, visit webosarchive.org for help.");
+// webOS Archive: our backend answers a bad login the SAME way regardless of
+// whether the email or the password was wrong (verifyDeviceLogin treats both
+// identically, on purpose, so a failed attempt can't be used to probe which
+// emails have accounts). HP's PAMS1100 ("your password is incorrect") assumed a
+// backend that COULD tell the two apart -- ours can't, so reusing that string
+// here would be a confident, specific-sounding claim we cannot actually back up.
+label_error_invalidCredentials = rb.$L("Incorrect email or password. Please try again.");
 label_error_unableToCreateAccountText = rb.$L("We are unable to create an account for you. Please try again in a few minutes. If the problem continues, visit webosarchive.org for help.");
 label_error_unableToCreateAccountTextNetworkingIssue = rb.$L("We are unable to create a new account right now. Please try again in a few minutes. If the problem continues, visit webosarchive.org for help.");
 label_error_noNameText = rb.$L("Please enter your name.");
@@ -151,6 +158,7 @@ enyo.kind({
 									{name: "invalidSignInPassword", content: label_error_invalidSignInPassword, className: "message", showing: false},
 									{name: "noProfileFoundText", content: label_error_noProfileFoundText, className: "message", showing: false},
 									{name: "unableToSignInText", content: label_error_unableToSignInText, className: "message", showing: false},
+									{name: "invalidCredentials", content: label_error_invalidCredentials, className: "message", showing: false},
 									{name: "unableToCreateAccountText", content: label_error_unableToCreateAccountText, className: "message", showing: false},
 									{name: "signInButton", kind: "Button", className: "enyo-button-affirmative", caption: label_button_signIn, onclick: "signIn", disabled: true},
 	 								{kind: "Button",  className: "enyo-button-light", caption: label_button_cancel, onclick: "goBack"}
@@ -949,6 +957,7 @@ enyo.kind({
 		this.$.invalidSignInEmailText.setShowing(false);
 		this.$.invalidSignInPassword.setShowing(false);
 		this.$.unableToSignInText.setShowing(false);
+		this.$.invalidCredentials.setShowing(false);
 		this.$.unableToSignInText2.setShowing(false);
 		this.$.unableToCreateAccountText.setShowing(false);
 		this.$.unableToCreateAccountTextNetworkingIssue.setShowing(false);
@@ -1028,6 +1037,14 @@ enyo.kind({
 			this.$.invalidSignInPassword.setShowing(false);
 			this.$.forgotPwdPopupEmail.setValue(this.$.signInEmail.getValue());
 			this.recoverPassword();
+		} else if (inResponse.errorCode == "LOGIN_ERROR"){
+			// webOS Archive: what our backend actually sends for "wrong email OR
+			// wrong password" (authenticateFromDevice -> {authFailed:true} ->
+			// LoginProfileCommandAssistant's fallback sendError). Previously fell
+			// through to the generic unableToSignInText branch below, which reads
+			// like a server outage ("try again in a few minutes") rather than what
+			// it almost always is: a typo in the email or password just entered.
+			this.$.invalidCredentials.setShowing(true);
 		} else {
 			console.info("Sign in failure: " + JSON.stringify(inResponse));
 			this.$.unableToSignInText.setShowing(true);

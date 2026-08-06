@@ -16,7 +16,9 @@ done
 # Ours, never HP's — remove rather than restore. Must go together with the
 # services.json/sources.json restore above, or the service would try to load a
 # file that is no longer there.
-rm -f "$SVC/handlers/UpdateUsernameCommandAssistant.js"
+rm -f "$SVC/handlers/UpdateUsernameCommandAssistant.js" \
+      "$SVC/handlers/SyncDeviceNameCommandAssistant.js" \
+      "$SVC/handlers/SignOutCommandAssistant.js"
 
 rm -rf "/usr/palm/applications/$APPID"
 kill $(ps | grep "[c]om.palm.service.palmprofile" | awk '{print $1}') >/dev/null 2>&1 || true

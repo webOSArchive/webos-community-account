@@ -30,7 +30,7 @@
  
  label_popup_header_recoverPassword = rb.$L("Recover Password");
  label_popup_body1_recoverPassword = rb.$L("Answer your security question to recover your password.");
-@@ -59,31 +59,31 @@
+@@ -59,31 +59,38 @@
  
  label_popup_header_recoverPwdSentEmailPopup = rb.$L("Recover Password");
  label_popup_body1_recoverPwdSentEmailPopup = rb.$L("Follow the link in that email to reset your password.");
@@ -57,6 +57,13 @@
 -label_error_unableToCreateAccountText = rb.$L("We are unable to create an account for you. Please try again in a few minutes or contact HP for help resolving this problem. Visit http://hpwebos.com/support for more information.");
 -label_error_unableToCreateAccountTextNetworkingIssue = rb.$L("We are unable to create a new account right now. Please try again in a few minutes or contact HP for help resolving this problem. Visit http://hpwebos.com/support for more information.");
 +label_error_unableToSignInText = rb.$L("We were unable to sign you in. Please try again in a few minutes. If the problem continues, visit webosarchive.org for help.");
++// webOS Archive: our backend answers a bad login the SAME way regardless of
++// whether the email or the password was wrong (verifyDeviceLogin treats both
++// identically, on purpose, so a failed attempt can't be used to probe which
++// emails have accounts). HP's PAMS1100 ("your password is incorrect") assumed a
++// backend that COULD tell the two apart -- ours can't, so reusing that string
++// here would be a confident, specific-sounding claim we cannot actually back up.
++label_error_invalidCredentials = rb.$L("Incorrect email or password. Please try again.");
 +label_error_unableToCreateAccountText = rb.$L("We are unable to create an account for you. Please try again in a few minutes. If the problem continues, visit webosarchive.org for help.");
 +label_error_unableToCreateAccountTextNetworkingIssue = rb.$L("We are unable to create a new account right now. Please try again in a few minutes. If the problem continues, visit webosarchive.org for help.");
  label_error_noNameText = rb.$L("Please enter your name.");
@@ -69,7 +76,7 @@
  label_error_answerText = rb.$L("Please answer the security question.");
  label_error_answerLength = rb.$L("Security answer must be less than 50 characters.");
  label_error_nameDeviceLengthText = rb.$L("Device name is limited to 256 characters. Shorten name and try again.");
-@@ -119,7 +119,7 @@
+@@ -119,7 +126,7 @@
  						{kind:"Control", layoutKind: "VFlexLayout", className: 'login', align: 'center', flex:1, components:[
  							{kind: "Control", layoutKind: "VFlexLayout", align:'center', className:"contentDefaults", pack: 'justify', components: [
  								{content: rb.$L("Let's get started"), className: "title"},
@@ -78,7 +85,7 @@
  								{kind: enyo.Control, className: "box", style: "margin: 0; padding: 10px 45px; -webkit-border-image: none ", components: [
  										{kind: "Button", caption: rb.$L("Sign In"), flex:1, className: "enyo-button-light", onclick: "createSignInView"},
  										{kind: "Button", caption: rb.$L("Create New Account"), flex:1, style:"margin-top: 20px", className: "enyo-button-light", onclick: "createAccountView"},
-@@ -135,7 +135,7 @@
+@@ -135,7 +142,7 @@
  						{kind:"Control", layoutKind: "VFlexLayout", className: 'login', align: 'center', flex:1, components:[
  							{kind: "Control", layoutKind: "VFlexLayout", align:'center', className:"contentDefaults2", pack: 'justify', components: [
  								{content: rb.$L("Sign In"), className: "title"},
@@ -87,7 +94,15 @@
  								{kind: "Control", className: "box", style:"margin-top: 15px", components: [
  									{kind: "Control", className: "form-row", components: [
  										{content: label_field_email, className: "label"},
-@@ -165,7 +165,7 @@
+@@ -151,6 +158,7 @@
+ 									{name: "invalidSignInPassword", content: label_error_invalidSignInPassword, className: "message", showing: false},
+ 									{name: "noProfileFoundText", content: label_error_noProfileFoundText, className: "message", showing: false},
+ 									{name: "unableToSignInText", content: label_error_unableToSignInText, className: "message", showing: false},
++									{name: "invalidCredentials", content: label_error_invalidCredentials, className: "message", showing: false},
+ 									{name: "unableToCreateAccountText", content: label_error_unableToCreateAccountText, className: "message", showing: false},
+ 									{name: "signInButton", kind: "Button", className: "enyo-button-affirmative", caption: label_button_signIn, onclick: "signIn", disabled: true},
+ 	 								{kind: "Button",  className: "enyo-button-light", caption: label_button_cancel, onclick: "goBack"}
+@@ -165,7 +173,7 @@
  						{kind:"Control", layoutKind: "VFlexLayout", className: 'login', align: 'center', flex:1, components:[
  							{kind: "Control", layoutKind: "VFlexLayout", align:'center', className:"contentDefaults2", style:"550px", pack: 'justify', components: [
  								{content: label_header1_createProfile, className: "title"},
@@ -96,7 +111,7 @@
  								{kind: "Control", className: "box", components: [
  									{kind: "Control", className: "form-row", components: [
  										{content: label_field_name, className: "label"},
-@@ -193,14 +193,17 @@
+@@ -193,14 +201,17 @@
  										{name: "createPasswordConfirm", kind: "Input", inputType: "password", hint: "", className: "field", oninput: "createPasswordConfirmOnInput", onkeydown: "createPasswordConfirmOnKeyPress", onblur:"createPasswordConfirmOnBlur", onchange: "createPasswordConfirmOnChange", changeOnKeypress: false,},
  										{name: "passwordConfirmText", content: label_error_passwordMismatchText, className: "message", showing: false},
  									]},
@@ -116,7 +131,7 @@
  										{content: label_field_securityAnswer, className: "label"},
  										{name: "createAnswer", kind: "Input", hint: "", className: "field", onblur: "createAnswerOnBlur", onchange: "createAnswerOnChange", oninput: "createAnswerOnInput", onkeydown: "createAnswerOnKeyPress", changeOnKeypress: false, autoCapitalize: "lowercase", autocorrect: false, spellcheck: false},
  										{name: "answerText", content: label_error_answerText, className: "message", showing: false},
-@@ -373,7 +376,12 @@
+@@ -373,7 +384,12 @@
  				{name: "authFromChallengeQuestion", method: "authenticateAccountFromSecurityQuestion", onSuccess: "authFromChallengeQuestionSuccess", onFailure: "authFromChallengeQuestionFailure"},
  				{name: "changePassword", method: "changePassword", onSuccess: "changePasswordSuccess", onFailure: "changePasswordFailure"},
  				{name: "requestPasswordResetEmail", method: "requestPasswordResetEmail", onSuccess: "requestPasswordResetEmailSuccess", onFailure: "requestPasswordResetEmailFailure"},
@@ -130,7 +145,7 @@
  			]	
  		},
  		
-@@ -404,7 +412,7 @@
+@@ -404,7 +420,7 @@
  	    			this.$.signInButton.setDisabled(true);
  	    		}else{
  	    			this.$.invalidSignInEmailLengthText.setShowing(false);
@@ -139,7 +154,7 @@
  						this.$.signInButton.setDisabled(true);
  					} else {
  						this.$.signInButton.setDisabled(false);
-@@ -421,7 +429,7 @@
+@@ -421,7 +437,7 @@
      	this.$.invalidSignInEmailText.setShowing(false);
      	this.$.invalidSignInEmailLengthText.setShowing(false);
  		if (this.verifyEmail(this.$.signInEmail.getValue()) && this.verifyEmailLength(this.$.signInEmail.getValue()) ) {
@@ -148,7 +163,7 @@
  				this.$.signInButton.setDisabled(true);
  			} else {
  				this.$.signInButton.setDisabled(false);
-@@ -455,7 +463,7 @@
+@@ -455,7 +471,7 @@
  
  		if(!passEmpty) {
  			var l = this.$.signInPassword.getValue().length;
@@ -157,7 +172,7 @@
  				this.$.signInPasswordLengthText.setShowing(true);
  				this.$.signInButton.setDisabled(true);
  			} else if (passEmpty) {
-@@ -463,7 +471,7 @@
+@@ -463,7 +479,7 @@
  			} else {
  				this.$.signInPasswordLengthText.setShowing(false);
  				if (this.verifyEmail(this.$.signInEmail.getValue()) && this.verifyEmailLength(this.$.signInEmail.getValue()) ) {
@@ -166,7 +181,7 @@
  						this.$.signInButton.setDisabled(true);
  					} else {
  						this.$.signInButton.setDisabled(false);
-@@ -483,7 +491,7 @@
+@@ -483,7 +499,7 @@
  		var passEmpty = this.trim(this.$.signInPassword.getValue()).length == 0;
  		
  		if (this.verifyEmail(this.$.signInEmail.getValue()) && this.verifyEmailLength(this.$.signInEmail.getValue()) ) {
@@ -175,7 +190,7 @@
  				this.$.signInButton.setDisabled(true);
  			} else {
  				this.$.signInButton.setDisabled(false);
-@@ -499,7 +507,7 @@
+@@ -499,7 +515,7 @@
  			this.signInPasswordOnChange();
  			if (this.verifyEmail(this.$.signInEmail.getValue()) && this.verifyEmailLength(this.$.signInEmail.getValue())) {
  				this.$.signInButton.doClick();
@@ -184,7 +199,7 @@
  				this.$.signInPassword.forceFocus();
  				this.$.signInPassword.forceSelect();
  			} else {
-@@ -712,7 +720,7 @@
+@@ -712,7 +728,7 @@
  		if (passEmpty) {
  			this.$.createPassword.setValue("");
  			this.toggleCreateButton(false);
@@ -193,7 +208,7 @@
  			this.isErrorDisplayed = true;
  			this.$.passwordLengthText.setShowing(true);
  			this.toggleCreateButton(false);
-@@ -777,7 +785,7 @@
+@@ -777,7 +793,7 @@
  			this.$.passwordConfirmText.setContent(label_error_passwordMismatchText);
  			this.$.passwordConfirmText.setShowing(true);
  			this.toggleCreateButton(false);			
@@ -202,7 +217,7 @@
  			this.isErrorDisplayed = true;
  			this.$.passwordConfirmText.setContent(label_error_passwordLengthText);
  			this.$.passwordConfirmText.setShowing(true);
-@@ -875,8 +883,7 @@
+@@ -875,8 +891,7 @@
  			return false;
  		if(!this.verifyPasswords(this.$.createPassword.getValue(), this.$.createPasswordConfirm.getValue()))
  			return false;
@@ -212,7 +227,15 @@
  		if(!this.verifyEmailLength(this.$.createEmail.getValue()) || !this.verifyEmailLength(this.$.createEmailConfirm.getValue()) )
  			return false;
  		console.info("All input fields valid");
-@@ -977,7 +984,7 @@
+@@ -942,6 +957,7 @@
+ 		this.$.invalidSignInEmailText.setShowing(false);
+ 		this.$.invalidSignInPassword.setShowing(false);
+ 		this.$.unableToSignInText.setShowing(false);
++		this.$.invalidCredentials.setShowing(false);
+ 		this.$.unableToSignInText2.setShowing(false);
+ 		this.$.unableToCreateAccountText.setShowing(false);
+ 		this.$.unableToCreateAccountTextNetworkingIssue.setShowing(false);
+@@ -977,7 +993,7 @@
  		var lenPW = this.$.signInPassword.getValue().length;
  		var passEmpty = this.trim(this.$.signInPassword.getValue()) == "";
  
@@ -221,7 +244,22 @@
  			this.blurSignInInputFields();
  			this.clearAllSignInErrorMessages();
  			this.$.scrim.show();
-@@ -1173,6 +1180,9 @@
+@@ -1021,6 +1037,14 @@
+ 			this.$.invalidSignInPassword.setShowing(false);
+ 			this.$.forgotPwdPopupEmail.setValue(this.$.signInEmail.getValue());
+ 			this.recoverPassword();
++		} else if (inResponse.errorCode == "LOGIN_ERROR"){
++			// webOS Archive: what our backend actually sends for "wrong email OR
++			// wrong password" (authenticateFromDevice -> {authFailed:true} ->
++			// LoginProfileCommandAssistant's fallback sendError). Previously fell
++			// through to the generic unableToSignInText branch below, which reads
++			// like a server outage ("try again in a few minutes") rather than what
++			// it almost always is: a typo in the email or password just entered.
++			this.$.invalidCredentials.setShowing(true);
+ 		} else {
+ 			console.info("Sign in failure: " + JSON.stringify(inResponse));
+ 			this.$.unableToSignInText.setShowing(true);
+@@ -1173,6 +1197,9 @@
  	},
  	
  	getQuestionsSpinnerCommon: function(showSpinner){
@@ -231,7 +269,7 @@
  		var locale = enyo.g11n.currentLocale();
  		if (this.$.listSelector.items == null || this.$.listSelector.items.length <= 1) {
  			if(enyo.application.FirstUse.getDataConnection()){
-@@ -1438,13 +1448,13 @@
+@@ -1438,13 +1465,13 @@
  				this.$.confirmPwdDontMatchText.setShowing(false);
  			}
  		}
@@ -247,7 +285,7 @@
  			this.$.signInWithPwdButton.setDisabled(true);
  		} else {
  			this.$.signInWithPwdButton.setDisabled(false);
-@@ -1460,7 +1470,7 @@
+@@ -1460,7 +1487,7 @@
  
  		var pl = this.$.newPasswordInput.getValue().length;
  		var cl = this.$.newConfirmPasswordInput.getValue().length;
@@ -256,7 +294,7 @@
  			this.$.signInWithPwdButton.setDisabled(true);
  		} else {
  			this.$.signInWithPwdButton.setDisabled(false);
-@@ -1471,7 +1481,7 @@
+@@ -1471,7 +1498,7 @@
  		if(inResponse.keyCode == 13){
  			this.newPasswordInputOnChange();
  			var pl = this.$.newPasswordInput.getValue().length;
@@ -265,7 +303,7 @@
  				this.$.newConfirmPasswordInput.forceFocus();
  				this.$.newConfirmPasswordInput.forceSelect();
  			} 
-@@ -1485,11 +1495,11 @@
+@@ -1485,11 +1512,11 @@
  	newPasswordInputOnBlur: function(){
  		var pl = this.$.newPasswordInput.getValue().length;
  		var cl = this.$.newConfirmPasswordInput.getValue().length;
@@ -279,7 +317,7 @@
  				if(this.$.newPasswordInput.getValue() != this.$.newConfirmPasswordInput.getValue()){
  					this.$.confirmPwdDontMatchText.setShowing(true);
  					this.$.signInWithPwdButton.setDisabled(true);
-@@ -1542,7 +1552,7 @@
+@@ -1542,7 +1569,7 @@
  		var cl = this.$.newConfirmPasswordInput.getValue().length;
  		if (this.$.newConfirmPasswordInput.getValue() != this.$.newPasswordInput.getValue()){
  			this.$.confirmPwdDontMatchText.setShowing(true);
@@ -288,7 +326,7 @@
  			this.$.pwdLengthText.setShowing(true);
  			this.$.signInWithPwdButton.setDisabled(true);
  		}else {
-@@ -1836,7 +1846,7 @@
+@@ -1836,7 +1863,7 @@
  	},
  	
  	verifyPasswords: function(pwd1, pwd2){
@@ -297,7 +335,7 @@
  			return false;
  		return true;
  	},
-@@ -1975,14 +1985,23 @@
+@@ -1975,14 +2002,23 @@
  		this.$.createAnswer.forceBlur();
  	},
  	
