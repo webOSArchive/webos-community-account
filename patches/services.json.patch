@@ -1,0 +1,20 @@
+--- com.palm.service.palmprofile/services.json
++++ com.palm.service.palmprofile/services.json
+@@ -137,11 +137,15 @@
+ 				    "name": "setTimeZoneFromIP",
+ 				    "assistant": "SetTimeZoneFromIP"
+ 				},
+-				{   
++				{
+ 					"name": "assignDeviceNameNoAcctInfoArgs",
+ 					"assistant": "AssignDeviceNameNoAcctInfoArgsCommandAssistant"
++				},
++				{
++					"name": "updateUsername",
++					"assistant": "UpdateUsernameCommandAssistant"
+ 				}
+-				
++
+ 			]
+ 		}
+ 	]

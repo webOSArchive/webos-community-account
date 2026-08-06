@@ -16,19 +16,26 @@ it becomes the device profile, **without wiping the device**.
 ```
 webos/
 ├── patches/                         # unified diffs against stock webOS 3.0.5 (topaz, build 86)
-│   ├── palm_profile_util.js.patch           # palmprofile SERVICE: base -> our backend (HTTPS via curlPost); upsert account
+│   ├── palm_profile_util.js.patch           # palmprofile SERVICE: base -> our backend (HTTPS via curlPost); upsert account; cache username
 │   ├── LoginProfileCommandAssistant.js.patch# login: skip dead LCN precheck; create local profile
 │   ├── IsEmailAvailableCommandAssistant.js.patch # create: email precheck -> our backend (was dead LCN)
 │   ├── GetTermsAndConditionsCommandAssistant.js.patch # terms POST -> curlPost (HTTPS)
+│   ├── GetTokenCommandAssistant.js.patch    # getAccountToken also returns accountUsername
+│   ├── services.json.patch                  # register the updateUsername bus method
+│   ├── sources.json.patch                   # load our UpdateUsernameCommandAssistant.js
 │   ├── FirstUse.js.patch                    # app: neuter erase/OTA/shutdown/powerdown; confirm page + Done
 │   ├── Signin.js.patch                      # app: skip hanging PostSignIn OTA/backup checks
-│   └── Palm.js.patch                        # app: terms card -> our TOS endpoint (skip dead LCN lookup)
+│   ├── Palm.js.patch                        # app: terms card -> our TOS endpoint (skip dead LCN lookup)
+│   └── accounts-*.patch                     # the STOCK Accounts settings app — see "Accounts app" below
+├── service/
+│   └── UpdateUsernameCommandAssistant.js    # ours, not HP's: palm://com.palm.accountservices/updateUsername
 ├── app/
 │   ├── appinfo.json                 # our app id com.palm.app.webosaccount (com.palm.* = privileged)
 │   ├── config.js                    # FirstUse.config = [palm (terms), signin]
-│   └── Updater-Helper.js            # vendored from webosarchive/webos-common (Enyo) — self-update
-│                                    # via the Museum entry "webOS Community Account Manager"
-│                                    # (Launcher icon = firstuse's own icon; the clone keeps it)
+│   ├── Updater-Helper.js            # vendored from webosarchive/webos-common (Enyo) — self-update
+│   │                                # via the Museum entry "webOS Community Account Manager"
+│   │                                # (Launcher icon = firstuse's own icon; the clone keeps it)
+│   └── accounts/UsernameDialog.js   # new kind for the stock Accounts app's Username row
 ├── ipk/
 │   ├── postinst                     # run by Preware/ipkgservice as root: app -> rootfs, patch service
 │   └── prerm                        # uninstall: restore <file>.stock service files, remove app
@@ -115,6 +122,48 @@ doubles as an environment check. On success it enables Continue; on failure it
 keeps Continue disabled and shows an "Update required" popup telling the user to
 install the community update. A device without the modern-TLS curl can't get past
 the terms card into sign-in/create.
+
+## The Accounts app (settings) — profile editing and usernames
+
+Signing in is one app; *managing* the account is another. The stock **Accounts**
+settings app (`com.palm.app.accounts`) has always had a full profile editor
+behind the account row at the top — name, email, password, and the list of
+devices on the account (`source/palmID/`). It was dead on arrival for us: its
+entry call `getAggregatedAccountInfo` had no backend, so tapping the row showed
+*"Error — Must be connected to a network to communicate with HP's Cloud
+Services."* That message is a red herring; the network was always fine.
+
+Almost all of the fix is **server-side** — those assistants are stock and already
+post through our patched transport, so `device.php` just had to answer them
+(`getAccountInfoAggregate`, `isUserValid`, `updateAccountInfo`,
+`changeEmailAddress`, `changePassword`, `assignDeviceName`). The patches here are
+only for what the UI itself had to change:
+
+- **Username instead of security question.** We store no security answers, so
+  that row now edits the account's **username**. Accounts are created with the
+  username set to the member's email address; this is where they pick a real
+  handle — shareable, and more private than an email. New `UsernameDialog.js`,
+  plus `updateUsername` on the service.
+- **Other apps read the username from `getAccountToken`**, which now returns
+  `accountUsername` alongside `accountAlias` and `token`. That is the intended
+  integration point — apps already call it for the token. It falls back to the
+  alias, so callers never need a null check. `UpdateUsernameCommandAssistant`
+  writes the new handle straight into the local db8 profile on success, so the
+  change is visible to other apps immediately rather than at next sign-in.
+- **Device list.** `assignDeviceName` had never been implemented server-side and
+  was failing silently, which is why the DEVICES section had nothing readable in
+  it. It works now; model and OS are captured from the device block already sent
+  at sign-in.
+- Two stock bugs fixed while in there: an empty device list rendered one row of
+  "undefined" (HP wrapped a lone object by testing `.length`, which also wraps an
+  empty array), and the password dialog enforced 6 characters where the server
+  requires 8.
+
+**`services.json` and `sources.json` are both patched** — a new bus method needs
+an entry in each (method→assistant, and the file to load). Unlike handlers, which
+hot-reload per call, these are only read when the service host starts, so
+`deploy.sh`/`postinst` kill the palmprofile process to force a respawn. Skip that
+and `updateUsername` stays unknown until the next reboot.
 
 ## Gotchas we hit (so you don't)
 

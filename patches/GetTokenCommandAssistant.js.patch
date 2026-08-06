@@ -1,0 +1,16 @@
+--- com.palm.service.palmprofile/handlers/GetTokenCommandAssistant.js
++++ com.palm.service.palmprofile/handlers/GetTokenCommandAssistant.js
+@@ -15,6 +15,13 @@
+ 					if (result.token) { // it can be undefined!
+ 						future.result = {
+ 							"accountAlias": result.alias,
++							// webOS Archive: the member's chosen public handle.
++							// This is THE way other apps get it — they already
++							// call getAccountToken for the token itself. Falls
++							// back to the alias so callers can use it directly
++							// without a null check (pre-username profiles and
++							// accounts that never set one).
++							"accountUsername": result.username || result.alias,
+ 							"token": result.token,
+ 							"accountState": result.state,
+ 							"uniqueId": result.uniqueId,

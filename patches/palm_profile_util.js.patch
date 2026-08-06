@@ -1,5 +1,5 @@
---- a/com.palm.service.palmprofile/utils/palm_profile_util.js
-+++ b/com.palm.service.palmprofile/utils/palm_profile_util.js
+--- com.palm.service.palmprofile/utils/palm_profile_util.js
++++ com.palm.service.palmprofile/utils/palm_profile_util.js
 @@ -2,9 +2,19 @@
  
  var Util = Class.create ({
@@ -37,11 +37,10 @@
  		return this.ACCOUNTS_URL;
  	},
  	
-@@ -88,6 +97,56 @@
- 	
+@@ -89,6 +98,56 @@
  	postRequest: function(methodName, requestObj, errorFuture, errorCode, postType) {
  		return this.postRequestInternal(methodName, requestObj, errorFuture, errorCode, ((postType=="GEOIP") ? this.GEOIP_URL : this.ACCOUNTS_URL));
-+	},
+ 	},
 +
 +	// webOS Archive: HTTPS POST via the OTA's modern /usr/bin/curl, shelled out
 +	// with child_process. The stock AjaxCall path uses node 0.4.12's TLS, which
@@ -91,9 +90,10 @@
 +			future.result = { responseText: responseText, responseJSON: json, status: status };
 +		});
 +		return future;
- 	},
++	},
  	
  	postRequestInternal: function(methodName, requestObj, errorFuture, errorCode, THE_URL) {
+ 		var messageBody = JSON.stringify(requestObj), 
 @@ -109,7 +168,7 @@
  			ServiceLog.log("Handling race senario."); //this.urlFuture is still going on
  			this.urlFuture.then(function(urlFuture){
@@ -134,7 +134,24 @@
  			}
  			dbFuture.exception = {"errorCode": "NULL_DB_URL", "errorText":"Couldn't get url from db"};
  		});
-@@ -242,40 +304,80 @@
+@@ -178,7 +240,15 @@
+ 		var token = new PalmProfile();
+ 		
+ 		token.alias = authenticateInfo.accountAlias;
+-		
++
++		// webOS Archive: the member's public handle, kept in the local profile so
++		// any app can read it from getAccountToken without a network round trip.
++		// Guarded: an older backend omits it, and writing undefined would blank
++		// a username the device already knows.
++		if (authenticateInfo.accountUsername) {
++			token.username = authenticateInfo.accountUsername;
++		}
++
+ 		token.authenticatedTime = authenticateInfo.authenticationTime;
+ 		token.tokenexpireTime = authenticateInfo.expirationTime;
+ 		token.state = authenticateInfo.accountState;
+@@ -242,40 +312,80 @@
  	},
  		
  	createLocalAccount: function (username, onComplete) {

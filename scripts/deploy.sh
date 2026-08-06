@@ -4,7 +4,9 @@
 # Run from anywhere; paths resolve relative to this script.
 #
 # What it does:
-#   1. Patches the on-device palmprofile SERVICE -> our catalog backend (redirect + skip-LCN login).
+#   1. Patches the on-device palmprofile SERVICE -> our catalog backend (redirect + skip-LCN login),
+#      adds the username surface (getAccountToken publishes it; updateUsername sets it),
+#      and patches the stock Accounts settings app so its profile editor works.
 #   2. Builds our optional account app com.palm.app.webosaccount from a neutered firstuse clone.
 #   3. Registers it (rescan). Then launch it to sign in.
 set -e
@@ -12,6 +14,7 @@ HERE="$(cd "$(dirname "$0")/.." && pwd)"      # webos/
 PATCHES="$HERE/patches"; APP="$HERE/app"
 
 SVC=/usr/palm/services/com.palm.service.palmprofile
+ACC=/usr/palm/applications/com.palm.app.accounts   # stock Accounts settings app
 FU=/usr/palm/applications/com.palm.app.firstuse
 APPID=com.palm.app.webosaccount
 APPDIR=/usr/palm/applications/$APPID
@@ -38,6 +41,30 @@ apply "$SVC/utils/palm_profile_util.js"                   "$PATCHES/palm_profile
 apply "$SVC/handlers/LoginProfileCommandAssistant.js"     "$PATCHES/LoginProfileCommandAssistant.js.patch"
 apply "$SVC/handlers/IsEmailAvailableCommandAssistant.js" "$PATCHES/IsEmailAvailableCommandAssistant.js.patch"
 apply "$SVC/handlers/GetTermsAndConditionsCommandAssistant.js" "$PATCHES/GetTermsAndConditionsCommandAssistant.js.patch"
+
+echo ">> 1b) palmprofile: publish the account username + add updateUsername"
+# getAccountToken gains accountUsername — this is how every other app on the
+# device reads the member's handle. updateUsername is ours; it needs an entry in
+# services.json (bus method -> assistant) AND in sources.json (file gets loaded).
+apply "$SVC/handlers/GetTokenCommandAssistant.js"         "$PATCHES/GetTokenCommandAssistant.js.patch"
+apply "$SVC/services.json"                                "$PATCHES/services.json.patch"
+apply "$SVC/sources.json"                                 "$PATCHES/sources.json.patch"
+novacom put "file://$SVC/handlers/UpdateUsernameCommandAssistant.js" < "$HERE/service/UpdateUsernameCommandAssistant.js"
+echo "  installed $SVC/handlers/UpdateUsernameCommandAssistant.js"
+# Handlers hot-reload per call, but services.json/sources.json are read only when
+# the service host starts — without this the new method is "unknown" until reboot.
+dev 'kill $(ps | grep "[c]om.palm.service.palmprofile" | awk "{print \$1}") 2>/dev/null; echo restarted'
+
+echo ">> 1c) patch the Accounts settings app (profile editor + username row)"
+# The stock Accounts app's profile editor (source/palmID) was dead: its entry
+# call, getAggregatedAccountInfo, had no backend. device.php now answers it, and
+# these put the username where HP had the security question.
+apply "$ACC/depends.js"                       "$PATCHES/accounts-depends.js.patch"
+apply "$ACC/source/palmID/ProfileSettings.js" "$PATCHES/accounts-ProfileSettings.js.patch"
+apply "$ACC/source/palmID/PalmIDUtilities.js" "$PATCHES/accounts-PalmIDUtilities.js.patch"
+apply "$ACC/source/palmID/PasswdDialog.js"    "$PATCHES/accounts-PasswdDialog.js.patch"
+novacom put "file://$ACC/source/palmID/UsernameDialog.js" < "$APP/accounts/UsernameDialog.js"
+echo "  installed $ACC/source/palmID/UsernameDialog.js"
 
 echo ">> 2) build app: clone firstuse -> $APPID"
 dev "rm -rf $APPDIR && cp -r $FU $APPDIR && echo cloned"
