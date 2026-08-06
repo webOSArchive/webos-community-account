@@ -21,14 +21,22 @@ webos/
 │   ├── IsEmailAvailableCommandAssistant.js.patch # create: email precheck -> our backend (was dead LCN)
 │   ├── GetTermsAndConditionsCommandAssistant.js.patch # terms POST -> curlPost (HTTPS)
 │   ├── GetTokenCommandAssistant.js.patch    # getAccountToken also returns accountUsername
-│   ├── services.json.patch                  # register the updateUsername bus method
-│   ├── sources.json.patch                   # load our UpdateUsernameCommandAssistant.js
+│   ├── services.json.patch                  # register updateUsername / syncDeviceName / signOut
+│   ├── sources.json.patch                   # load the three assistants below
 │   ├── FirstUse.js.patch                    # app: neuter erase/OTA/shutdown/powerdown; confirm page + Done
-│   ├── Signin.js.patch                      # app: skip hanging PostSignIn OTA/backup checks
+│   ├── Signin.js.patch                      # app: skip hanging PostSignIn OTA/backup checks;
+│   │                                        # one completion card for both sign-in and a
+│   │                                        # relaunch that finds an account already set up
+│   │                                        # (forceSignIn:true skips straight to setup); honest
+│   │                                        # wrong-password/-email copy instead of a fallback
+│   │                                        # that reads like a server outage; syncDeviceName
+│   │                                        # call before finishing
 │   ├── Palm.js.patch                        # app: terms card -> our TOS endpoint (skip dead LCN lookup)
 │                                            # (the Accounts settings APP is not patched here — see below)
 ├── service/
-│   └── UpdateUsernameCommandAssistant.js    # ours, not HP's: palm://com.palm.accountservices/updateUsername
+│   ├── UpdateUsernameCommandAssistant.js    # ours, not HP's: palm://com.palm.accountservices/updateUsername
+│   ├── SyncDeviceNameCommandAssistant.js    # ours: reads the local device name, publishes it to the account
+│   └── SignOutCommandAssistant.js           # ours: revokes the token server-side, then clears it locally
 ├── app/
 │   ├── appinfo.json                 # our app id com.palm.app.webosaccount (com.palm.* = privileged)
 │   ├── config.js                    # FirstUse.config = [palm (terms), signin]
@@ -173,6 +181,28 @@ hot-reload per call, these are only read when the service host starts, so
 `deploy.sh`/`postinst` kill the palmprofile process to force a respawn. Skip that
 and `updateUsername` stays unknown until the next reboot.
 
+## Device name sync and sign-out
+
+Two more service methods behind the profile editor, both called from the
+`com.palm.app.accounts` side but implemented here:
+
+- **`syncDeviceName`** — pushes this device's current name up to the account,
+  falling back to `"TouchPad"` if the device has none. Read-only on the local
+  name: **not** the stock `assignDeviceNameNoAcctInfoArgs`, which looks like it
+  does the same job but actually *writes* the local name (composing a possessive
+  `"<user>'s TouchPad"`) — calling that on every profile open would rename the
+  device each time. The Accounts app calls it before every profile fetch, so a
+  rename in Settings shows up immediately rather than one visit later; `Signin.js`
+  also calls it once at the end of sign-in, since `assignDeviceName` (the original
+  namer) only ever ran on the account-*create* path, never on plain sign-in.
+- **`signOut`** — revokes the token server-side (`device.php?m=deauthenticate`)
+  and clears it locally *even if the server call fails*, so a member can't get
+  stranded signed-in by a bad connection. Also renames the local account record
+  to `"Local User"` rather than merely clearing the token: the record is left in
+  place (deleting it breaks `com.palm.app.accounts`, which reads
+  `palmProfileAccount.username`/`.icon` unguarded), so if the previous member's
+  actual name stayed on it, the next person to pick up the device would see it.
+
 ## Gotchas we hit (so you don't)
 
 - **App id must start with `com.palm.`** — webOS grants privileged service/db8 access by id
@@ -183,3 +213,18 @@ and `updateUsername` stays unknown until the next reboot.
   restart / rescan. `killall LunaSysMgr` re-registers but is slow; `rescan` usually suffices.
 - **NEVER let stock firstuse run to completion** — its completion path resets the device and
   wipes `/media/cryptofs/apps` (most 1P apps live there, not in ROM). Our app removes that path.
+- **Bump the version on every rebuild, even packaging-only changes with no app-code
+  difference.** Rebuilding an ipk under the identical filename let Preware/WOSQI serve a
+  stale cached copy on a real install — the correct file existed on disk the whole time,
+  but the wrong one got installed, and it looked exactly like the postinst fix hadn't
+  taken (see 1.1.1). Confirmed by pulling the file Preware had actually fetched and
+  finding it timestamped from the earlier build. A same-named rebuild is indistinguishable
+  from no rebuild at all to anything caching by filename.
+- **A bus method needs its handler file copied in `postinst`, not just declared in
+  `sources.json`.** Adding `syncDeviceName`/`signOut` to `services.json`/`sources.json`
+  without adding them to postinst's file-copy loop shipped an ipk where the manifest
+  named handlers that were never actually placed at `$SVC/handlers/` — the app calls
+  worked in every *manual* test (deploy.sh's separate per-file push loop always installed
+  all three directly) but silently failed on a real from-scratch install. `sources.json`
+  and the copy loop are two lists that have to be kept in sync by hand; there's nothing
+  that checks this for you.
