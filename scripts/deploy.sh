@@ -48,8 +48,10 @@ echo ">> 1b) palmprofile: publish the account username + add updateUsername"
 apply "$SVC/handlers/GetTokenCommandAssistant.js"         "$PATCHES/GetTokenCommandAssistant.js.patch"
 apply "$SVC/services.json"                                "$PATCHES/services.json.patch"
 apply "$SVC/sources.json"                                 "$PATCHES/sources.json.patch"
-novacom put "file://$SVC/handlers/UpdateUsernameCommandAssistant.js" < "$HERE/service/UpdateUsernameCommandAssistant.js"
-echo "  installed $SVC/handlers/UpdateUsernameCommandAssistant.js"
+for a in UpdateUsernameCommandAssistant SyncDeviceNameCommandAssistant; do
+  novacom put "file://$SVC/handlers/$a.js" < "$HERE/service/$a.js"
+  echo "  installed $SVC/handlers/$a.js"
+done
 # Handlers hot-reload per call, but services.json/sources.json are read only when
 # the service host starts — without this the new method is "unknown" until reboot.
 dev 'kill $(ps | grep "[c]om.palm.service.palmprofile" | awk "{print \$1}") 2>/dev/null; echo restarted'
