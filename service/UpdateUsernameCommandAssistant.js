@@ -65,10 +65,19 @@ var UpdateUsernameCommandAssistant = Class.create({
 	// Best-effort local cache update. The server is already authoritative at this
 	// point, so a db8 failure must not turn a successful rename into an error —
 	// the next sign-in re-reads it from AuthenticateInfoEx anyway.
+	// updateProfile() returns a Future: db8 failures (e.g. merge rejected) land on
+	// dbFuture.exception asynchronously, NOT as a synchronous throw, so a bare
+	// try/catch around the call never sees them. Chain onto the Future so a failed
+	// local cache write is at least logged instead of vanishing silently.
 	saveUsername: function (username) {
 		try {
 			var dbService = new PalmProfileDBService();
-			dbService.updateProfile({ "username": username });
+			var dbFuture = dbService.updateProfile({ "username": username });
+			dbFuture.then(this, function () {
+				if (dbFuture.exception) {
+					ServiceLog.log("updateUsername: could not cache username locally: " + JSON.stringify(dbFuture.exception));
+				}
+			});
 		} catch (e) {
 			ServiceLog.log("updateUsername: could not cache username locally: " + e);
 		}

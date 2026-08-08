@@ -45,6 +45,7 @@ novacom run file:///bin/cat -- "$SVC/handlers/GetTermsAndConditionsCommandAssist
 # username surface: getAccountToken publishes it, updateUsername sets it, and the
 # two manifests are what make the new method exist on the bus at all.
 novacom run file:///bin/cat -- "$SVC/handlers/GetTokenCommandAssistant.js"         > "$BUILD/data/$STAGE_REL/service/GetTokenCommandAssistant.js"
+novacom run file:///bin/cat -- "$SVC/handlers/GetAccountInfoAggregateAssistant.js" > "$BUILD/data/$STAGE_REL/service/GetAccountInfoAggregateAssistant.js"
 novacom run file:///bin/cat -- "$SVC/handlers/UpdateUsernameCommandAssistant.js"   > "$BUILD/data/$STAGE_REL/service/UpdateUsernameCommandAssistant.js"
 novacom run file:///bin/cat -- "$SVC/handlers/SyncDeviceNameCommandAssistant.js"   > "$BUILD/data/$STAGE_REL/service/SyncDeviceNameCommandAssistant.js"
 novacom run file:///bin/cat -- "$SVC/handlers/SignOutCommandAssistant.js"         > "$BUILD/data/$STAGE_REL/service/SignOutCommandAssistant.js"
@@ -60,6 +61,11 @@ grep -q "\"visible\": true" "$BUILD/data/$STAGE_REL/app/resources/en/appinfo.jso
 grep -q "accountUsername" "$BUILD/data/$STAGE_REL/service/GetTokenCommandAssistant.js"
 grep -q "updateUsername" "$BUILD/data/$STAGE_REL/service/services.json"
 grep -q "UpdateUsernameCommandAssistant" "$BUILD/data/$STAGE_REL/service/sources.json"
+# saveUsername's db8 write is async (Future), so a bare try/catch around it can
+# never see a merge failure — without this chained .then() a stale local cache
+# fails 100% silently (root cause of the getAccountToken-vs-Accounts-app mismatch).
+grep -q "dbFuture.exception" "$BUILD/data/$STAGE_REL/service/UpdateUsernameCommandAssistant.js" || {
+    echo "!! UpdateUsernameCommandAssistant.js on-device is missing the async cache-failure fix — redeploy first" >&2; exit 1; }
 grep -q "syncDeviceName" "$BUILD/data/$STAGE_REL/service/services.json"
 grep -q "signOut" "$BUILD/data/$STAGE_REL/service/services.json"
 # The localized appinfo files OVERRIDE the base, so a version that only got bumped

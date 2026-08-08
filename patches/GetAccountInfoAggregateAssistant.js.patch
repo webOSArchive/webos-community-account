@@ -1,0 +1,24 @@
+--- com.palm.service.palmprofile/handlers/GetAccountInfoAggregateAssistant.js
++++ com.palm.service.palmprofile/handlers/GetAccountInfoAggregateAssistant.js
+@@ -50,6 +50,21 @@
+ 	            var result = profileFuture.result.responseJSON;
+ 	            if(result.OutAccountInfoAggregate) {
+ 	                ServiceLog.log("---------- profileFuture result --------- " + JSON.stringify(result.OutAccountInfoAggregate));
++	                // webOS Archive: self-heal the local username cache every time the
++	                // Accounts app fetches the server-authoritative profile — not just
++	                // on an explicit change. UsernameDialog skips its save round trip
++	                // when the field is untouched, so without this, viewing or
++	                // re-confirming an already-correct username never refreshes the
++	                // local cache getAccountToken serves to every other app.
++	                var freshUsername = result.OutAccountInfoAggregate.accountInfo && result.OutAccountInfoAggregate.accountInfo.username;
++	                if (freshUsername) {
++	                    var cacheFuture = (new PalmProfileDBService()).updateProfile({ "username": freshUsername });
++	                    cacheFuture.then(this, function () {
++	                        if (cacheFuture.exception) {
++	                            ServiceLog.log("GetAccountInfoAggregate: could not refresh cached username: " + JSON.stringify(cacheFuture.exception));
++	                        }
++	                    });
++	                }
+ 	                future.result = result.OutAccountInfoAggregate;
+ 	                return;
+ 	            }

@@ -50,6 +50,7 @@ echo ">> 1b) palmprofile: publish the account username + add updateUsername"
 # device reads the member's handle. updateUsername is ours; it needs an entry in
 # services.json (bus method -> assistant) AND in sources.json (file gets loaded).
 apply "$SVC/handlers/GetTokenCommandAssistant.js"         "$PATCHES/GetTokenCommandAssistant.js.patch"
+apply "$SVC/handlers/GetAccountInfoAggregateAssistant.js" "$PATCHES/GetAccountInfoAggregateAssistant.js.patch"
 apply "$SVC/services.json"                                "$PATCHES/services.json.patch"
 apply "$SVC/sources.json"                                 "$PATCHES/sources.json.patch"
 for a in UpdateUsernameCommandAssistant SyncDeviceNameCommandAssistant SignOutCommandAssistant; do
