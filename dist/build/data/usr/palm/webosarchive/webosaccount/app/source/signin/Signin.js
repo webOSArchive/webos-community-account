@@ -132,6 +132,10 @@ enyo.kind({
 										{kind: "Button", caption: rb.$L("Create New Account"), flex:1, style:"margin-top: 20px", className: "enyo-button-light", onclick: "createAccountView"},
 								]},
 								{kind: "Control", className: "link-button", content: rb.$L("Why do I need an account?"), onclick: "openPalmProfilePopup"},
+								// webOS Archive: account setup must stay optional under OOBE too — there is no
+								// separate "skip" chrome there like a standalone launch gets from the card/window
+								// system, so the intro card itself needs an explicit way out.
+								{kind: "Control", className: "link-button skip-setup", content: rb.$L("Skip Account Setup"), onclick: "skipSetup"},
 								{name: "unableToCreateAccountTextNetworkingIssue", style: "margin-top: 15px", content: label_error_unableToCreateAccountTextNetworkingIssue, className: "message", showing: false},
 							]},
 							{name: "serverError3", content: "Server error", className: "errorcode", showing: false, ondblclick:"errorCode3DoubleClk"}
@@ -1857,7 +1861,15 @@ enyo.kind({
 		this.clearAllSignInErrorMessages();
 		this.$.pane.selectViewByName("introView").render();
 	},
-	
+
+	// webOS Archive: account setup is optional, both standalone and under OOBE.
+	// Reuses the same safe-close path as a completed setup — no erase, no reset,
+	// no shutdown — so this behaves identically to skipping OOBE steps that have
+	// their own skip button.
+	skipSetup: function(){
+		enyo.application.FirstUse.closeApp();
+	},
+
 	postLoginSettings: function(){
 		console.info("in Post login setings....");
 	},

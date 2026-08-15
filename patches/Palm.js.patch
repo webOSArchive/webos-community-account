@@ -1,6 +1,6 @@
 --- a/com.palm.app.firstuse/source/tnc/Palm.js
 +++ b/com.palm.app.firstuse/source/tnc/Palm.js
-@@ -1,13 +1,16 @@
+@@ -1,13 +1,20 @@
 -label_dialog_palmTnc = rb.$L("HP Terms & Conditions");
 +label_dialog_palmTnc = rb.$L("Terms of Service");
  label_popup_palm_header = rb.$L("Do you accept?");
@@ -10,6 +10,10 @@
  label_button_accept = rb.$L("Accept");
  label_button_decline = rb.$L("Decline");
  label_button_continue = rb.$L("Continue");
++// webOS Archive: account setup must stay optional under OOBE too — there is no
++// separate "skip" chrome there like a standalone launch gets from the card/window
++// system, so the card itself needs an explicit way out.
++label_button_skip = rb.$L("Skip Account Setup");
  
 -label_popup_palm_error_header = rb.$L("Server Error");
 -label_popup_palm_error_body = rb.$L("Please visit http://hpwebos.com/support to help resolve this problem");
@@ -21,16 +25,19 @@
  label_popup_palm_error_button = rb.$L("Close");
  
  
-@@ -46,7 +49,7 @@
+@@ -46,8 +53,9 @@
  					{name: "palmCheckBox", kind: enyo.CheckBox, checked: false},
  						{content: rb.$L("I accept the terms and conditions"), style:"margin:0 0 0 10px"}
  					]},
 -				{kind: enyo.Button, className: "enyo-button-affirmative", onclick: "continueButton", caption: label_button_continue}
+-			]}
 +				{name: "continueBtn", kind: enyo.Button, className: "enyo-button-affirmative", onclick: "continueButton", caption: label_button_continue, disabled: true}
- 			]}
++			]},
++			{kind: "Control", className: "link-button skip-setup", content: label_button_skip, onclick: "skipSetup"}
  		]},
  				
-@@ -130,11 +133,14 @@
+ 		{kind: "Scrim", layoutKind: "VFlexLayout", align: "center", pack: "center", components: [
+@@ -130,11 +138,14 @@
      		console.info("Already did the deed...2");
  		} else {
  	  	    this.getTermsResponseCalled = false;
@@ -48,7 +55,7 @@
  		}
      },
      
-@@ -170,7 +176,10 @@
+@@ -170,7 +181,10 @@
      },
      
  	getTerms: function(inSender, inResponse){
@@ -60,7 +67,7 @@
      	enyo.application.FirstUse.setServerURL(url);
  		var lang = enyo.g11n.currentLocale().getLanguage();
  		console.info("Getting terms from: " + url);
-@@ -182,24 +191,35 @@
+@@ -182,24 +196,35 @@
  		this.getTermsResponseCalled = true;
  
  		if(inResponse.returnValue) {
@@ -101,9 +108,20 @@
  		if (this.$.palmCheckBox.getChecked()) {
  			this.doFinish();
  		} else {
-@@ -218,11 +238,17 @@
+@@ -216,13 +241,27 @@
+ 	palmDeclined: function(){
+ 		this.$.palmPopup.close();
  	},
- 	
+-	
++
++	// webOS Archive: account setup is optional, both standalone and under OOBE.
++	// Reuses the same safe-close path as a completed setup — no erase, no reset,
++	// no shutdown — so this behaves identically to skipping OOBE steps that have
++	// their own skip button.
++	skipSetup: function(){
++		enyo.application.FirstUse.closeApp();
++	},
++
  	palmError: function(){
 -		this.$.palmErrorPopup.close();		
 +		this.$.palmErrorPopup.close();

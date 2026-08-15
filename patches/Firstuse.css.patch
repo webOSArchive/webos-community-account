@@ -1,0 +1,23 @@
+--- com.palm.app.firstuse/css/Firstuse.css
++++ com.palm.app.firstuse/css/Firstuse.css
+@@ -264,6 +264,20 @@
+ }
+ .enyo-button.restart.enyo-button-down .enyo-button-icon {
+ 	background-position:0 -32px;
++}
++/* webOS Archive: sits beside .restart (fixed, bottom:5px/left:5px/width:130px) —
++   pinned to the same row rather than left in normal flow, which used to land it
++   on top of Start Over at the bottom of short cards. */
++.link-button.skip-setup {
++	position:fixed;
++	bottom:5px;
++	left:145px;
++	height:36px;
++	line-height:36px;
++	white-space:nowrap;
++	text-transform:uppercase;
++	text-decoration:none;
++	font-size:14px;
+ }
+ .enyo-scrim {
+ 	opacity: 0.7;

@@ -5,6 +5,10 @@ label_popup_palm_body = rb.$L("To set up a webOS Account, you must accept the Te
 label_button_accept = rb.$L("Accept");
 label_button_decline = rb.$L("Decline");
 label_button_continue = rb.$L("Continue");
+// webOS Archive: account setup must stay optional under OOBE too — there is no
+// separate "skip" chrome there like a standalone launch gets from the card/window
+// system, so the card itself needs an explicit way out.
+label_button_skip = rb.$L("Skip Account Setup");
 
 // webOS Archive: this popup doubles as the HTTPS-readiness gate. The account flow
 // requires the community update's modern TLS (the service reaches our origin via
@@ -50,7 +54,8 @@ enyo.kind({
 						{content: rb.$L("I accept the terms and conditions"), style:"margin:0 0 0 10px"}
 					]},
 				{name: "continueBtn", kind: enyo.Button, className: "enyo-button-affirmative", onclick: "continueButton", caption: label_button_continue, disabled: true}
-			]}
+			]},
+			{kind: "Control", className: "link-button skip-setup", content: label_button_skip, onclick: "skipSetup"}
 		]},
 				
 		{kind: "Scrim", layoutKind: "VFlexLayout", align: "center", pack: "center", components: [
@@ -236,7 +241,15 @@ enyo.kind({
 	palmDeclined: function(){
 		this.$.palmPopup.close();
 	},
-	
+
+	// webOS Archive: account setup is optional, both standalone and under OOBE.
+	// Reuses the same safe-close path as a completed setup — no erase, no reset,
+	// no shutdown — so this behaves identically to skipping OOBE steps that have
+	// their own skip button.
+	skipSetup: function(){
+		enyo.application.FirstUse.closeApp();
+	},
+
 	palmError: function(){
 		this.$.palmErrorPopup.close();
 		this.$.palmPopup.close();

@@ -76,7 +76,7 @@
  label_error_answerText = rb.$L("Please answer the security question.");
  label_error_answerLength = rb.$L("Security answer must be less than 50 characters.");
  label_error_nameDeviceLengthText = rb.$L("Device name is limited to 256 characters. Shorten name and try again.");
-@@ -119,7 +126,7 @@
+@@ -119,12 +126,16 @@
  						{kind:"Control", layoutKind: "VFlexLayout", className: 'login', align: 'center', flex:1, components:[
  							{kind: "Control", layoutKind: "VFlexLayout", align:'center', className:"contentDefaults", pack: 'justify', components: [
  								{content: rb.$L("Let's get started"), className: "title"},
@@ -85,7 +85,16 @@
  								{kind: enyo.Control, className: "box", style: "margin: 0; padding: 10px 45px; -webkit-border-image: none ", components: [
  										{kind: "Button", caption: rb.$L("Sign In"), flex:1, className: "enyo-button-light", onclick: "createSignInView"},
  										{kind: "Button", caption: rb.$L("Create New Account"), flex:1, style:"margin-top: 20px", className: "enyo-button-light", onclick: "createAccountView"},
-@@ -135,7 +142,7 @@
+ 								]},
+ 								{kind: "Control", className: "link-button", content: rb.$L("Why do I need an account?"), onclick: "openPalmProfilePopup"},
++								// webOS Archive: account setup must stay optional under OOBE too — there is no
++								// separate "skip" chrome there like a standalone launch gets from the card/window
++								// system, so the intro card itself needs an explicit way out.
++								{kind: "Control", className: "link-button skip-setup", content: rb.$L("Skip Account Setup"), onclick: "skipSetup"},
+ 								{name: "unableToCreateAccountTextNetworkingIssue", style: "margin-top: 15px", content: label_error_unableToCreateAccountTextNetworkingIssue, className: "message", showing: false},
+ 							]},
+ 							{name: "serverError3", content: "Server error", className: "errorcode", showing: false, ondblclick:"errorCode3DoubleClk"}
+@@ -135,7 +146,7 @@
  						{kind:"Control", layoutKind: "VFlexLayout", className: 'login', align: 'center', flex:1, components:[
  							{kind: "Control", layoutKind: "VFlexLayout", align:'center', className:"contentDefaults2", pack: 'justify', components: [
  								{content: rb.$L("Sign In"), className: "title"},
@@ -94,7 +103,7 @@
  								{kind: "Control", className: "box", style:"margin-top: 15px", components: [
  									{kind: "Control", className: "form-row", components: [
  										{content: label_field_email, className: "label"},
-@@ -151,6 +158,7 @@
+@@ -151,6 +162,7 @@
  									{name: "invalidSignInPassword", content: label_error_invalidSignInPassword, className: "message", showing: false},
  									{name: "noProfileFoundText", content: label_error_noProfileFoundText, className: "message", showing: false},
  									{name: "unableToSignInText", content: label_error_unableToSignInText, className: "message", showing: false},
@@ -102,7 +111,7 @@
  									{name: "unableToCreateAccountText", content: label_error_unableToCreateAccountText, className: "message", showing: false},
  									{name: "signInButton", kind: "Button", className: "enyo-button-affirmative", caption: label_button_signIn, onclick: "signIn", disabled: true},
  	 								{kind: "Button",  className: "enyo-button-light", caption: label_button_cancel, onclick: "goBack"}
-@@ -165,7 +173,7 @@
+@@ -165,7 +177,7 @@
  						{kind:"Control", layoutKind: "VFlexLayout", className: 'login', align: 'center', flex:1, components:[
  							{kind: "Control", layoutKind: "VFlexLayout", align:'center', className:"contentDefaults2", style:"550px", pack: 'justify', components: [
  								{content: label_header1_createProfile, className: "title"},
@@ -111,7 +120,7 @@
  								{kind: "Control", className: "box", components: [
  									{kind: "Control", className: "form-row", components: [
  										{content: label_field_name, className: "label"},
-@@ -193,14 +201,17 @@
+@@ -193,14 +205,17 @@
  										{name: "createPasswordConfirm", kind: "Input", inputType: "password", hint: "", className: "field", oninput: "createPasswordConfirmOnInput", onkeydown: "createPasswordConfirmOnKeyPress", onblur:"createPasswordConfirmOnBlur", onchange: "createPasswordConfirmOnChange", changeOnKeypress: false,},
  										{name: "passwordConfirmText", content: label_error_passwordMismatchText, className: "message", showing: false},
  									]},
@@ -131,7 +140,7 @@
  										{content: label_field_securityAnswer, className: "label"},
  										{name: "createAnswer", kind: "Input", hint: "", className: "field", onblur: "createAnswerOnBlur", onchange: "createAnswerOnChange", oninput: "createAnswerOnInput", onkeydown: "createAnswerOnKeyPress", changeOnKeypress: false, autoCapitalize: "lowercase", autocorrect: false, spellcheck: false},
  										{name: "answerText", content: label_error_answerText, className: "message", showing: false},
-@@ -373,7 +384,12 @@
+@@ -373,7 +388,12 @@
  				{name: "authFromChallengeQuestion", method: "authenticateAccountFromSecurityQuestion", onSuccess: "authFromChallengeQuestionSuccess", onFailure: "authFromChallengeQuestionFailure"},
  				{name: "changePassword", method: "changePassword", onSuccess: "changePasswordSuccess", onFailure: "changePasswordFailure"},
  				{name: "requestPasswordResetEmail", method: "requestPasswordResetEmail", onSuccess: "requestPasswordResetEmailSuccess", onFailure: "requestPasswordResetEmailFailure"},
@@ -145,7 +154,7 @@
  			]	
  		},
  		
-@@ -404,7 +420,7 @@
+@@ -404,7 +424,7 @@
  	    			this.$.signInButton.setDisabled(true);
  	    		}else{
  	    			this.$.invalidSignInEmailLengthText.setShowing(false);
@@ -154,7 +163,7 @@
  						this.$.signInButton.setDisabled(true);
  					} else {
  						this.$.signInButton.setDisabled(false);
-@@ -421,7 +437,7 @@
+@@ -421,7 +441,7 @@
      	this.$.invalidSignInEmailText.setShowing(false);
      	this.$.invalidSignInEmailLengthText.setShowing(false);
  		if (this.verifyEmail(this.$.signInEmail.getValue()) && this.verifyEmailLength(this.$.signInEmail.getValue()) ) {
@@ -163,7 +172,7 @@
  				this.$.signInButton.setDisabled(true);
  			} else {
  				this.$.signInButton.setDisabled(false);
-@@ -455,7 +471,7 @@
+@@ -455,7 +475,7 @@
  
  		if(!passEmpty) {
  			var l = this.$.signInPassword.getValue().length;
@@ -172,7 +181,7 @@
  				this.$.signInPasswordLengthText.setShowing(true);
  				this.$.signInButton.setDisabled(true);
  			} else if (passEmpty) {
-@@ -463,7 +479,7 @@
+@@ -463,7 +483,7 @@
  			} else {
  				this.$.signInPasswordLengthText.setShowing(false);
  				if (this.verifyEmail(this.$.signInEmail.getValue()) && this.verifyEmailLength(this.$.signInEmail.getValue()) ) {
@@ -181,7 +190,7 @@
  						this.$.signInButton.setDisabled(true);
  					} else {
  						this.$.signInButton.setDisabled(false);
-@@ -483,7 +499,7 @@
+@@ -483,7 +503,7 @@
  		var passEmpty = this.trim(this.$.signInPassword.getValue()).length == 0;
  		
  		if (this.verifyEmail(this.$.signInEmail.getValue()) && this.verifyEmailLength(this.$.signInEmail.getValue()) ) {
@@ -190,7 +199,7 @@
  				this.$.signInButton.setDisabled(true);
  			} else {
  				this.$.signInButton.setDisabled(false);
-@@ -499,7 +515,7 @@
+@@ -499,7 +519,7 @@
  			this.signInPasswordOnChange();
  			if (this.verifyEmail(this.$.signInEmail.getValue()) && this.verifyEmailLength(this.$.signInEmail.getValue())) {
  				this.$.signInButton.doClick();
@@ -199,7 +208,7 @@
  				this.$.signInPassword.forceFocus();
  				this.$.signInPassword.forceSelect();
  			} else {
-@@ -712,7 +728,7 @@
+@@ -712,7 +732,7 @@
  		if (passEmpty) {
  			this.$.createPassword.setValue("");
  			this.toggleCreateButton(false);
@@ -208,7 +217,7 @@
  			this.isErrorDisplayed = true;
  			this.$.passwordLengthText.setShowing(true);
  			this.toggleCreateButton(false);
-@@ -777,7 +793,7 @@
+@@ -777,7 +797,7 @@
  			this.$.passwordConfirmText.setContent(label_error_passwordMismatchText);
  			this.$.passwordConfirmText.setShowing(true);
  			this.toggleCreateButton(false);			
@@ -217,7 +226,7 @@
  			this.isErrorDisplayed = true;
  			this.$.passwordConfirmText.setContent(label_error_passwordLengthText);
  			this.$.passwordConfirmText.setShowing(true);
-@@ -875,8 +891,7 @@
+@@ -875,8 +895,7 @@
  			return false;
  		if(!this.verifyPasswords(this.$.createPassword.getValue(), this.$.createPasswordConfirm.getValue()))
  			return false;
@@ -227,7 +236,7 @@
  		if(!this.verifyEmailLength(this.$.createEmail.getValue()) || !this.verifyEmailLength(this.$.createEmailConfirm.getValue()) )
  			return false;
  		console.info("All input fields valid");
-@@ -942,6 +957,7 @@
+@@ -942,6 +961,7 @@
  		this.$.invalidSignInEmailText.setShowing(false);
  		this.$.invalidSignInPassword.setShowing(false);
  		this.$.unableToSignInText.setShowing(false);
@@ -235,7 +244,7 @@
  		this.$.unableToSignInText2.setShowing(false);
  		this.$.unableToCreateAccountText.setShowing(false);
  		this.$.unableToCreateAccountTextNetworkingIssue.setShowing(false);
-@@ -977,7 +993,7 @@
+@@ -977,7 +997,7 @@
  		var lenPW = this.$.signInPassword.getValue().length;
  		var passEmpty = this.trim(this.$.signInPassword.getValue()) == "";
  
@@ -244,7 +253,7 @@
  			this.blurSignInInputFields();
  			this.clearAllSignInErrorMessages();
  			this.$.scrim.show();
-@@ -1021,6 +1037,14 @@
+@@ -1021,6 +1041,14 @@
  			this.$.invalidSignInPassword.setShowing(false);
  			this.$.forgotPwdPopupEmail.setValue(this.$.signInEmail.getValue());
  			this.recoverPassword();
@@ -259,7 +268,7 @@
  		} else {
  			console.info("Sign in failure: " + JSON.stringify(inResponse));
  			this.$.unableToSignInText.setShowing(true);
-@@ -1173,6 +1197,9 @@
+@@ -1173,6 +1201,9 @@
  	},
  	
  	getQuestionsSpinnerCommon: function(showSpinner){
@@ -269,7 +278,7 @@
  		var locale = enyo.g11n.currentLocale();
  		if (this.$.listSelector.items == null || this.$.listSelector.items.length <= 1) {
  			if(enyo.application.FirstUse.getDataConnection()){
-@@ -1438,13 +1465,13 @@
+@@ -1438,13 +1469,13 @@
  				this.$.confirmPwdDontMatchText.setShowing(false);
  			}
  		}
@@ -285,7 +294,7 @@
  			this.$.signInWithPwdButton.setDisabled(true);
  		} else {
  			this.$.signInWithPwdButton.setDisabled(false);
-@@ -1460,7 +1487,7 @@
+@@ -1460,7 +1491,7 @@
  
  		var pl = this.$.newPasswordInput.getValue().length;
  		var cl = this.$.newConfirmPasswordInput.getValue().length;
@@ -294,7 +303,7 @@
  			this.$.signInWithPwdButton.setDisabled(true);
  		} else {
  			this.$.signInWithPwdButton.setDisabled(false);
-@@ -1471,7 +1498,7 @@
+@@ -1471,7 +1502,7 @@
  		if(inResponse.keyCode == 13){
  			this.newPasswordInputOnChange();
  			var pl = this.$.newPasswordInput.getValue().length;
@@ -303,7 +312,7 @@
  				this.$.newConfirmPasswordInput.forceFocus();
  				this.$.newConfirmPasswordInput.forceSelect();
  			} 
-@@ -1485,11 +1512,11 @@
+@@ -1485,11 +1516,11 @@
  	newPasswordInputOnBlur: function(){
  		var pl = this.$.newPasswordInput.getValue().length;
  		var cl = this.$.newConfirmPasswordInput.getValue().length;
@@ -317,7 +326,7 @@
  				if(this.$.newPasswordInput.getValue() != this.$.newConfirmPasswordInput.getValue()){
  					this.$.confirmPwdDontMatchText.setShowing(true);
  					this.$.signInWithPwdButton.setDisabled(true);
-@@ -1542,7 +1569,7 @@
+@@ -1542,7 +1573,7 @@
  		var cl = this.$.newConfirmPasswordInput.getValue().length;
  		if (this.$.newConfirmPasswordInput.getValue() != this.$.newPasswordInput.getValue()){
  			this.$.confirmPwdDontMatchText.setShowing(true);
@@ -326,7 +335,22 @@
  			this.$.pwdLengthText.setShowing(true);
  			this.$.signInWithPwdButton.setDisabled(true);
  		}else {
-@@ -1836,7 +1863,7 @@
+@@ -1830,13 +1861,21 @@
+ 		this.clearAllSignInErrorMessages();
+ 		this.$.pane.selectViewByName("introView").render();
+ 	},
+-	
++
++	// webOS Archive: account setup is optional, both standalone and under OOBE.
++	// Reuses the same safe-close path as a completed setup — no erase, no reset,
++	// no shutdown — so this behaves identically to skipping OOBE steps that have
++	// their own skip button.
++	skipSetup: function(){
++		enyo.application.FirstUse.closeApp();
++	},
++
+ 	postLoginSettings: function(){
+ 		console.info("in Post login setings....");
  	},
  	
  	verifyPasswords: function(pwd1, pwd2){
@@ -335,7 +359,7 @@
  			return false;
  		return true;
  	},
-@@ -1975,14 +2002,23 @@
+@@ -1975,14 +2014,23 @@
  		this.$.createAnswer.forceBlur();
  	},
  	
