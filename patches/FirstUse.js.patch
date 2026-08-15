@@ -13,7 +13,7 @@
  		first: true,
  		createProfile: false,
  		firstName: "",
-@@ -72,14 +72,25 @@
+@@ -72,14 +72,37 @@
  				{kind: "VFlexBox", align: "center", components: [
  					{kind: "Control", layoutKind: "VFlexLayout", align:'center', className:"contentDefaults", pack: 'justify', components: [
  						{name: "completeSetup", content: rb.$L("Thanks!"), className: "title"},
@@ -34,6 +34,18 @@
  
  		{kind: "MyApps.FirstUse.SpinnerOverlayPopup", name: "spinnerOverlay"},
 +
++		// webOS Archive: skipping setup closes this app same as a completed sign-in
++		// does, which under OOBE means the device reboots to finish. The sign-in
++		// path already has a "Thanks!" card the user sees before tapping Done, so
++		// the freeze isn't a surprise there; Skip is a single tap with no such
++		// warning otherwise. No buttons — it's just shown for a moment before
++		// wosaSkipSetup closes the app out from under it.
++		{name: "wosaSkipRestartPopup", kind: "ModalDialog", lazy: false, scrim: true, className: "popup",
++		 caption: rb.$L("Just a Moment"),
++		 components: [
++			{content: rb.$L("Your device may need to restart to complete setup."), className: "enyo-text-body"},
++		]},
++
 +		// webOS Archive: self-update via App Museum II (webos-common Updater-Helper).
 +		// Checks the catalog entry titled "webOS Community Account Manager" and
 +		// prompts + installs via Preware when a newer version is listed.
@@ -41,7 +53,7 @@
  		
  		{name: "SimStatusQuery", kind: "TelephonyService", method: "simStatusQuery",subscribe: true, onSuccess: "handleSimStatusQuery"},
  		{name: "PlatformQuery", kind: "TelephonyService", method: "platformQuery",subscribe: false, onSuccess: "handlePlatformQuery", onFailure: "handlePlatformQueryFail"},
-@@ -196,9 +207,14 @@
+@@ -196,9 +219,14 @@
  			    {name: "setTimeZoneFromIP", method: "setTimeZoneFromIP", onResponse:"postTimeZoneResponse"},
  			    {name: "assignDeviceName", method: "assignDeviceName", onSuccess: "assignDeviceNameSuccess", onFailure: "assignDeviceNameFailure"},
  			    {name: "getToken", method: "getAccountToken", onResponse: "getTokenResponse"},
@@ -56,7 +68,7 @@
  		{kind: "DeviceProfileService", onFailure: "handleGenericFailure", onSuccess: "handleGenericSuccess",
  			components:[
  				{name: "getDevice", method: "getDeviceProfile", onResponse: "getDeviceResponse"},
-@@ -292,6 +308,8 @@
+@@ -292,6 +320,8 @@
  	
  	create: function() {
  	    
@@ -65,7 +77,7 @@
  		this.assignDeviceNameRetry = false;
  		this.pluggedInStatusChangedInited = false;
  		this.log(typeof(inLocale));
-@@ -309,9 +327,99 @@
+@@ -309,9 +339,99 @@
  		if (enyo.application.FirstUse === undefined)
  		{
  			enyo.application.FirstUse = this;
@@ -86,12 +98,12 @@
 +				? enyo.json.parse(PalmSystem.launchParams) : null;
 +		} catch (e) {
 +			console.info("WOSA: launchParams parse error: " + e);
-+		}
+ 		}
 +		if (params && params.forceSignIn) {
 +			console.info("WOSA: forceSignIn — running setup even though an account may exist.");
 +			this.wosaStartSetup();
 +			return;
- 		}
++		}
 +		// Never leave the app showing nothing: if the probe does not answer, run
 +		// setup anyway. getAccountToken is a local db8 read, so this should not fire.
 +		this.wosaStartTimer = setTimeout(enyo.bind(this, "wosaStartSetup"), 4000);
@@ -165,7 +177,7 @@
  	
  	start: function() {
  	    
-@@ -378,17 +486,11 @@
+@@ -378,17 +498,11 @@
  
  	
  	getRestoreInProgressSuccess: function(inSender, inResponse) {
@@ -188,7 +200,7 @@
  	},
  	
  	getRestoreInProgressFailure: function() {
-@@ -828,19 +930,31 @@
+@@ -828,20 +942,40 @@
  	},
  	
  	done: function(){
@@ -227,9 +239,18 @@
 +	closeApp: function(){
 +		try { window.close(); } catch (e) { console.info("WOSA close err: " + e); }
  	},
++
++	// webOS Archive: called by both cards' "Skip Account Setup" link. Shows the
++	// restart warning for a moment so the UI doesn't just freeze with no
++	// explanation, then closes exactly like a completed sign-in would.
++	wosaSkipSetup: function(){
++		this.$.wosaSkipRestartPopup.openAtCenter();
++		setTimeout(enyo.bind(this, "closeApp"), 900);
++	},
  	
  	postTimeZoneResponse: function(inSender, inResponse){
-@@ -893,16 +1007,10 @@
+         console.info("postTimeZoneResponse Call Returned");
+@@ -893,16 +1027,10 @@
  	},
  	
  	firstUseComplete: function() {
@@ -250,7 +271,7 @@
  	},
  	
  	performSoftwareUpdate: function() {
-@@ -921,16 +1029,8 @@
+@@ -921,16 +1049,8 @@
  	
      
      powerDownDevice: function () {
@@ -269,7 +290,7 @@
  	},
  	
  	powerDownResponse:function(inSender, inResponse){
-@@ -1029,8 +1129,9 @@
+@@ -1029,8 +1149,9 @@
  		if(inResponse.returnValue){
  			this.setAcctAlias(inResponse.accountAlias);
  			this.setAcctToken(inResponse.token);

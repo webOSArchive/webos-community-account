@@ -87,6 +87,18 @@ enyo.kind({
 
 		{kind: "MyApps.FirstUse.SpinnerOverlayPopup", name: "spinnerOverlay"},
 
+		// webOS Archive: skipping setup closes this app same as a completed sign-in
+		// does, which under OOBE means the device reboots to finish. The sign-in
+		// path already has a "Thanks!" card the user sees before tapping Done, so
+		// the freeze isn't a surprise there; Skip is a single tap with no such
+		// warning otherwise. No buttons — it's just shown for a moment before
+		// wosaSkipSetup closes the app out from under it.
+		{name: "wosaSkipRestartPopup", kind: "ModalDialog", lazy: false, scrim: true, className: "popup",
+		 caption: rb.$L("Just a Moment"),
+		 components: [
+			{content: rb.$L("Your device may need to restart to complete setup."), className: "enyo-text-body"},
+		]},
+
 		// webOS Archive: self-update via App Museum II (webos-common Updater-Helper).
 		// Checks the catalog entry titled "webOS Community Account Manager" and
 		// prompts + installs via Preware when a newer version is listed.
@@ -955,6 +967,14 @@ enyo.kind({
 
 	closeApp: function(){
 		try { window.close(); } catch (e) { console.info("WOSA close err: " + e); }
+	},
+
+	// webOS Archive: called by both cards' "Skip Account Setup" link. Shows the
+	// restart warning for a moment so the UI doesn't just freeze with no
+	// explanation, then closes exactly like a completed sign-in would.
+	wosaSkipSetup: function(){
+		this.$.wosaSkipRestartPopup.openAtCenter();
+		setTimeout(enyo.bind(this, "closeApp"), 900);
 	},
 	
 	postTimeZoneResponse: function(inSender, inResponse){

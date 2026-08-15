@@ -1867,7 +1867,7 @@ enyo.kind({
 	// no shutdown — so this behaves identically to skipping OOBE steps that have
 	// their own skip button.
 	skipSetup: function(){
-		enyo.application.FirstUse.closeApp();
+		enyo.application.FirstUse.wosaSkipSetup();
 	},
 
 	postLoginSettings: function(){
