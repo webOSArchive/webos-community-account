@@ -270,8 +270,8 @@ body {
    on top of Start Over at the bottom of short cards. */
 .link-button.skip-setup {
 	position:fixed;
-	bottom:5px;
-	left:145px;
+	bottom:21px;
+	left:180px;
 	height:36px;
 	line-height:36px;
 	white-space:nowrap;
