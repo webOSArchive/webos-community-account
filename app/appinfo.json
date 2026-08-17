@@ -6,5 +6,7 @@
 	"main": "index.html",
 	"title": "webOS Account",
 	"icon": "images/icon.png",
+	"visible": true,
+	"removable": false,
 	"uiRevision": 2
 }
