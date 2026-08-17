@@ -87,12 +87,10 @@ enyo.kind({
 
 		{kind: "MyApps.FirstUse.SpinnerOverlayPopup", name: "spinnerOverlay"},
 
-		// webOS Archive: skipping setup closes this app same as a completed sign-in
-		// does, which under OOBE means the device reboots to finish. The sign-in
-		// path already has a "Thanks!" card the user sees before tapping Done, so
-		// the freeze isn't a surprise there; Skip is a single tap with no such
-		// warning otherwise. No buttons — it's just shown for a moment before
-		// wosaSkipSetup closes the app out from under it.
+		// webOS Archive: closing this app under OOBE (via Skip or the Done button)
+		// is what triggers the device reboot that finishes setup. No buttons — it's
+		// just shown for a moment before wosaSafeClose closes the app out from
+		// under it.
 		{name: "wosaSkipRestartPopup", kind: "ModalDialog", lazy: false, scrim: true, className: "popup",
 		 caption: rb.$L("Just a Moment"),
 		 components: [
@@ -130,7 +128,7 @@ enyo.kind({
 		]
 		},
 
-		{name: "wifiPopup", kind: "WiFiPopup", lazy: false, onCancel: "wifiCancel", className: "popup", onLabel: rb.$L("On"), offLabel: rb.$L("Off")},
+		{name: "wifiPopup", kind: "MyApps.FirstUse.WiFiPopup", lazy: false, onCancel: "wifiCancel", className: "popup", onLabel: rb.$L("On"), offLabel: rb.$L("Off")},
     	{name: "captivePortalPopup", kind: "ModalDialog", lazy: true, onBeforeOpen: "initCaptivePortalPopup", onCancel: "captivePortalCancel", className: "popup", width: "100%", height:"100%",
 			components: [
 				{
@@ -202,7 +200,7 @@ enyo.kind({
 			service: "palm://com.palm.power/com/palm/power/",
 			onResponse: "pluggedInStatusInit"
 		},
-		{kind: "PowerService", onResponse: "handlePowerServiceResponse", 
+		{kind: "PowerService", onResponse: "handlePowerServiceResponse",
 			components: [
 				{name: "powerDown", method: "machineOff", onResponse: "powerDownResponse"}
 			]
@@ -961,20 +959,64 @@ enyo.kind({
 		}
 	},
 
+	// webOS Archive: under OOBE, closing this app is what triggers the device
+	// reboot that finishes setup — an 8-10s freeze with no window chrome to hint
+	// anything is happening. Without a warning shown BEFORE that freeze starts, a
+	// tap here reads as "did nothing", which is exactly what Done looked like:
+	// completeDoneTap used to call closeApp() straight from the click handler.
 	completeDoneTap: function(){
-		this.closeApp();
+		this.wosaSafeClose();
 	},
 
 	closeApp: function(){
+		// webOS Archive: only finish OOBE (mark done + reboot) when LunaSysMgr
+		// actually launched us as the OOBE bootstrap app — it is the only
+		// launcher that passes locale/country on the URL (see gup() calls at
+		// the top of this file; inLocale is also what gates step 0 below). A
+		// normal relaunch afterward (Settings > Accounts, the app's own
+		// launcher icon) carries no such params and should just close like any
+		// other app — rebooting the device every time someone re-signs-in
+		// would be wrong.
+		if (typeof(inLocale) === "string") {
+			// webOS Archive: this is exactly what real stock HP firstuse called
+			// to finish OOBE in the common (no pending OTA) case — proven on
+			// real hardware, unlike our own markFirstUseDone()+machineReboot()
+			// attempt, which hung indefinitely (5+ minutes, no response) on a
+			// genuinely fresh device's first real OOBE completion. Stock's
+			// shutdown branch called ONLY PalmSystem.shutdown() and nothing
+			// else — no window.close() — trusting the OS to tear the window
+			// down itself as part of powering off. Calling window.close() here
+			// too raced ahead of that (shutdown() is async) and killed the card
+			// before the OS did anything, leaving LunaSysMgr with nothing to
+			// show (the stuck black screen). Match stock exactly: shutdown()
+			// alone, full stop.
+			console.info("WOSA: closeApp (OOBE) calling PalmSystem.shutdown()");
+			try {
+				if (window.PalmSystem && PalmSystem.shutdown) {
+					PalmSystem.shutdown();
+				}
+			} catch (e) { console.info("WOSA shutdown err: " + e); }
+			return;
+		}
+		console.info("WOSA: closeApp (standalone) calling window.close()");
 		try { window.close(); } catch (e) { console.info("WOSA close err: " + e); }
+		console.info("WOSA: closeApp window.close() call returned");
 	},
 
-	// webOS Archive: called by both cards' "Skip Account Setup" link. Shows the
-	// restart warning for a moment so the UI doesn't just freeze with no
-	// explanation, then closes exactly like a completed sign-in would.
-	wosaSkipSetup: function(){
+	// webOS Archive: shared by the Done button and both cards' "Skip Account
+	// Setup" link. Shows the restart warning for a moment so the UI doesn't just
+	// freeze with no explanation, then closes.
+	wosaSafeClose: function(){
+		console.info("WOSA: wosaSafeClose opening restart popup");
 		this.$.wosaSkipRestartPopup.openAtCenter();
-		setTimeout(enyo.bind(this, "closeApp"), 900);
+		setTimeout(enyo.bind(this, function(){
+			console.info("WOSA: wosaSafeClose timer fired");
+			this.closeApp();
+		}), 900);
+	},
+
+	wosaSkipSetup: function(){
+		this.wosaSafeClose();
 	},
 	
 	postTimeZoneResponse: function(inSender, inResponse){

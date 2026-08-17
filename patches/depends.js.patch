@@ -1,0 +1,18 @@
+--- depends.js.stock	2026-08-17 09:14:49
++++ depends.js.final	2026-08-17 09:14:29
+@@ -7,6 +7,7 @@
+ 	"$enyo/g11n/phone/",
+ 	"FirstUse.js",
+ 	"config.js",
++	"Updater-Helper.js",
+ 	"Service.js",
+ 	"source/language/Language.js",
+ 	"source/tnc/Palm.js",
+@@ -30,6 +31,7 @@
+     
+    '$enyo-lib/telephony/',
+    '$enyo-lib/wifi/',
++   "source/wifi/WOSAWiFiPopup.js",
+    "$enyo-lib/captiveportal/"
+ 
+ );

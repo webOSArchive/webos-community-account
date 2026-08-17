@@ -31,6 +31,7 @@ enyo.depends(
     
    '$enyo-lib/telephony/',
    '$enyo-lib/wifi/',
+   "source/wifi/WOSAWiFiPopup.js",
    "$enyo-lib/captiveportal/"
 
 );

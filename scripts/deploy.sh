@@ -82,16 +82,25 @@ apply "$APPDIR/css/Firstuse.css"        "$PATCHES/Firstuse.css.patch"
 novacom put "file://$APPDIR/appinfo.json" < "$APP/appinfo.json"
 novacom put "file://$APPDIR/config.js"    < "$APP/config.js"
 # (icon: the clone keeps firstuse's own images/icon.png — we are "cloning", not re-skinning)
-# self-updater (vendored from webos-common); add it to the enyo.depends list
+# self-updater (vendored from webos-common), and our WiFiPopup subclass that
+# debounces the "No Internet" false alarm during OOBE (see the file for why) —
+# both new files stock firstuse doesn't have, so push them then patch them
+# into the enyo.depends list.
 novacom put "file://$APPDIR/Updater-Helper.js" < "$APP/Updater-Helper.js"
-dev "sed -i 's|\"config.js\",|\"config.js\",\\n\t\"Updater-Helper.js\",|' $APPDIR/depends.js && grep -c Updater-Helper $APPDIR/depends.js"
+dev "mkdir -p $APPDIR/source/wifi"
+novacom put "file://$APPDIR/source/wifi/WOSAWiFiPopup.js" < "$APP/source/wifi/WOSAWiFiPopup.js"
+apply "$APPDIR/depends.js" "$PATCHES/depends.js.patch"
 # CRITICAL: localized resources/<locale>/appinfo.json each carry the id and OVERRIDE the base.
 # The id MUST start with com.palm. (webOS grants privileged calls by prefix) — set it everywhere.
 # They also carry visible:false (firstuse is hidden) — flip it so the app gets a Launcher icon.
-# And the VERSION: matching any value rather than firstuse's literal 3.0.0, so a bump in
-# app/appinfo.json reaches the locale files too. Miss this and the base says the new version
-# while every locale override still says the old one — and the override is what wins.
-dev "for f in \$(find $APPDIR/resources -name appinfo.json); do sed -i 's/com\\.palm\\.app\\.firstuse/$APPID/g; s/HP webOS/webOS Account/g; s/\"visible\": false/\"visible\": true/g; s/\"vendor\": \"HP\"/\"vendor\": \"webOS Archive\"/g; s/\"version\": \"[^\"]*\"/\"version\": \"$VERSION\"/g' \"\$f\"; done; echo reid-done"
+# removable:false is added alongside it (firstuse's stock locale files have no such key at
+# all, so this can't be a plain value-swap sed like the others — insert it right after
+# visible instead) so the app can't be accidentally uninstalled from the launcher, since it's
+# what carries the OOBE-completion logic. And the VERSION: matching any value rather than
+# firstuse's literal 3.0.0, so a bump in app/appinfo.json reaches the locale files too. Miss
+# this and the base says the new version while every locale override still says the old one —
+# and the override is what wins.
+dev "for f in \$(find $APPDIR/resources -name appinfo.json); do sed -i 's/com\\.palm\\.app\\.firstuse/$APPID/g; s/HP webOS/webOS Account/g; s/\"visible\": false/\"visible\": true/g; s/\"visible\": true/\"visible\": true, \"removable\": false/g; s/\"vendor\": \"HP\"/\"vendor\": \"webOS Archive\"/g; s/\"version\": \"[^\"]*\"/\"version\": \"$VERSION\"/g' \"\$f\"; done; echo reid-done"
 
 echo ">> 3) register (rescan)"
 dev 'luna-send -n 1 palm://com.palm.applicationManager/rescan "{}"'

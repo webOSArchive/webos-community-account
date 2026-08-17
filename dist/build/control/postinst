@@ -1,0 +1,53 @@
+#!/bin/sh
+# webOS Account (com.palm.app.webosaccount) installer.
+# Runs as ROOT via Preware / org.webosinternals.ipkgservice (the Museum app's
+# install path). The stock appinstaller does NOT run this script — this package
+# must be installed through Preware/ipkgservice.
+#
+# Installs the account app into the rootfs (/usr/palm/applications — same as a
+# system app; the com.palm.* id needs no cryptofs quirks there) and patches the
+# palmprofile service to talk to the webOS Archive backend. Pristine service
+# files are preserved as <file>.stock the first time; prerm restores them.
+
+APPID=com.palm.app.webosaccount
+STAGE=/media/cryptofs/apps/usr/palm/webosarchive/webosaccount
+SVC=/usr/palm/services/com.palm.service.palmprofile
+
+if [ ! -d "$STAGE/app" ]; then
+    echo "webosaccount: staging payload missing at $STAGE" >&2
+    exit 1
+fi
+
+mount -o remount,rw / || exit 1
+
+# 1) palmprofile service -> webOS Archive backend (keep pristine copies once).
+# services.json/sources.json are in this list because our updateUsername method
+# only exists on the bus if both manifests name it.
+for f in utils/palm_profile_util.js handlers/LoginProfileCommandAssistant.js handlers/IsEmailAvailableCommandAssistant.js handlers/GetTermsAndConditionsCommandAssistant.js handlers/GetTokenCommandAssistant.js services.json sources.json; do
+    if [ -f "$SVC/$f" ] && [ ! -f "$SVC/$f.stock" ]; then
+        cp "$SVC/$f" "$SVC/$f.stock"
+    fi
+    cp "$STAGE/service/$(basename "$f")" "$SVC/$f" || exit 1
+done
+# Purely ours — no stock file to preserve, so prerm deletes them outright. These
+# three are ALSO named in sources.json above, which the service reads at process
+# start; shipping the manifest entry without the file it points at is what broke
+# a from-scratch install (services.json/sources.json copied fine, these did not,
+# and the service had no handler for methods its own manifest declared).
+for a in UpdateUsernameCommandAssistant SyncDeviceNameCommandAssistant SignOutCommandAssistant; do
+    cp "$STAGE/service/$a.js" "$SVC/handlers/$a.js" || exit 1
+done
+
+# 2) the app itself
+rm -rf "/usr/palm/applications/$APPID"
+cp -r "$STAGE/app" "/usr/palm/applications/$APPID" || exit 1
+
+# 3) restart the palmprofile service. Handlers hot-reload per call, but
+# services.json/sources.json are only read when the service host starts, so
+# without this updateUsername stays unknown until the next reboot.
+kill $(ps | grep "[c]om.palm.service.palmprofile" | awk '{print $1}') >/dev/null 2>&1 || true
+
+# 4) register with the launcher
+luna-send -n 1 palm://com.palm.applicationManager/rescan '{}' >/dev/null 2>&1 || true
+
+exit 0

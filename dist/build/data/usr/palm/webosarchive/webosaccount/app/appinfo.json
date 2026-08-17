@@ -1,11 +1,12 @@
 {
 	"id": "com.palm.app.webosaccount",
-	"version": "1.1.5",
+	"version": "1.1.12",
 	"vendor": "webOS Archive",
 	"type": "web",
 	"main": "index.html",
 	"title": "webOS Account",
 	"icon": "images/icon.png",
 	"visible": true,
+	"removable": false,
 	"uiRevision": 2
 }
