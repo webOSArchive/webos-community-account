@@ -1,0 +1,143 @@
+var IsEmailAvailableCommandAssistant = Class.create({
+					
+	run: function(future){
+		this.blockingFuture = future;
+		var args = this.controller.args;
+		
+		if(!args.email) {
+			PalmProfileUtil.sendError (future, "INVALID_REQUEST", "Email address is not available");
+		}
+		
+		var email = args.email;
+		var requestBody = JSON.stringify(this.params);
+		this.getDeviceProfile (future, email, requestBody);
+		
+	},
+	
+	
+	getDeviceProfile: function (future, email, requestBody) {
+		var profileFuture = PalmCall.call("palm://com.palm.deviceprofile/", "getDeviceProfile", {});	
+		profileFuture.then(this, function() { 
+			var result = profileFuture.result;
+			ServiceLog.log("Got device profile");
+			if(result.returnValue && result.returnValue === true) {
+				
+				// Convert device props into the format that the server expects
+				var info = result.deviceInfo;
+				ServiceLog.log("Got device profile: ---- info -----"+JSON.stringify(info));
+				this.lcnEmailCall(future, info, email, requestBody);
+				return;
+			}
+			
+			PalmProfileUtil.sendError(future, "DEVICE_PROFILE_ERROR", "Could not read device profile");
+		});	
+	},
+
+	lcnEmailCall: function (future, deviceInfo, email, requestBody) {
+		
+		//TODO make this private
+		const LCN_URL = this.readLocationServerUrl();
+		
+		var headers = {
+			"headers": {
+				"Content-Type": "application/json",
+				"Connection": "close"
+			}
+		};
+		
+		// ServiceLog.log("URL is:::: "+LCN_URL+"?email="+email+"&deviceID="+deviceInfo.deviceID+"&nduID="+deviceInfo.nduID+"&serialNumber="+deviceInfo.serialNumber+"&deviceModel="+deviceInfo.deviceModel);
+		var prefsFuture = Foundations.Comms.AjaxCall.get(LCN_URL+'?email='+encodeURIComponent(email)+'&deviceId='+deviceInfo.deviceId+'&nduId='+deviceInfo.nduId+'&serialNumber='+deviceInfo.serialNumber+'&deviceModel='+deviceInfo.deviceModel, '', headers);
+		prefsFuture.then(this, function() { 
+            return PalmProfileUtil.handleThenResult(this, "IsEmailAvailableCommandAssistant", future, prefsFuture, function(){
+				var result = prefsFuture.result.responseJSON;
+				ServiceLog.log("---------- IsEmailAvailableCommandAssistant result ---------"+JSON.stringify(result));
+				if(result && result.getdomain) {
+					var location = result.getdomain;
+					if(location) {
+						if(location.rc === "DIR00000") {
+							var domain = location.locationdomain;
+							var host = location.locationhost;
+							ServiceLog.log("---- domain -------- "+domain+" ------- host ------"+host);
+							this.setAccountsUrl(domain, host, future);
+							
+							if('accountexists' in location) {
+								ServiceLog.log("---- location.accountexists -------- "+location.accountexists);
+								var exists = (location.accountexists === '0') ? true : false;
+								future.result = {
+									"isEmailAvailable": exists
+								}	
+								return;
+							}
+						} else if (location.rc === "DIR05001") {
+							PalmProfileUtil.sendError("LOCATION_SERVER_ERROR", "Missing or invalid email address");
+							return;
+						} else if (location.rc === "DIR90001") {
+							PalmProfileUtil.sendError("LOCATION_SERVER_ERROR", "DIR90001: could not fetch domain details");
+							return;
+						} 
+					}
+				}
+				PalmProfileUtil.sendError("LOCATION_SERVER_ERROR", "Server url - could not fetch domain details");
+			}); 
+		}); 
+	},
+	
+	readLocationServerUrl: function () {
+		var url;
+		var fileUtil = new FileUtil();
+		var fileContents = fileUtil.readConfigFile();
+		if(!fileContents) {
+			// Use default value configured in /usr/share/accountservices/accountservices.properties
+			if (fileUtil.exists("/usr/share/accountservices/accountservices.properties")) {
+				fileContents = fileUtil.readPropsFile("/usr/share/accountservices/accountservices.properties", "=");
+				ServiceLog.log("Retreiving Url from /usr/share/accountservices/accountservices.properties");
+				
+				if (fileContents) {
+					url = fileContents.location_server_url;
+				}
+			}	
+			if (!url && fileUtil.exists("config/accountservices.properties")) {
+				ServiceLog.log("Retreiving Url from config/accountservices.properties");
+				// If url is still empty, use default value configured in config/accountservices.properties
+				fileContents = fileUtil.readPropsFile("config/accountservices.properties", "=");
+				if (fileContents) {
+					url = fileContents.location_server_url;
+				}
+			}	
+		} else {
+			url = fileContents;
+		}
+		ServiceLog.log("-------- url --------------"+url);
+		return url;
+		
+	},
+	
+	setAccountsUrl: function (domain, host, future) {
+		ServiceLog.log("accounts url");
+		ServiceLog.log("----- send url info to systemservice --------");
+		this.updatePrefs(domain, host, future);
+		PalmProfileUtil.setServerUrl(host);	
+	},
+	
+	testUrl: function () {
+		ServiceLog.log("this is a test url");
+	},
+	
+	
+	updatePrefs: function (domain, host, future) {
+		ServiceLog.log("attempting to update preferences");
+		
+		var prefsFuture = PalmCall.call("palm://com.palm.systemservice/", "setPreferences", {"locationDomain": domain, "locationHost":host});	
+		prefsFuture.then(this, function() { 
+            return PalmProfileUtil.handleThenResult(this, "setPreferences", future, prefsFuture, function(){
+				var result = prefsFuture.result;
+				
+				if(result.returnValue && result.returnValue === true) {
+					// successfully updated
+					ServiceLog.log("------------ prefsFuture result ------------"+result.returnValue);
+					return;
+				}
+			});	
+		});	
+	}
+});

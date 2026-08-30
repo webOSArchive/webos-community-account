@@ -7,9 +7,14 @@ feedback (reviews, ratings) on apps, and potentially other functionality in the 
 **Status:** verified working on hardware — sign in on-device with a catalog account,
 it becomes the device profile, **without wiping the device**.
 
-> These are **patches/diffs** against HP's stock webOS 3.0.5 (`Nova-HP-Topaz` build 86),
-> not copies of HP's source. Apply them to the files already on the device. The installer
-> `.uImage` is **not** included — extract it from your own `devicetoolAIO.jar` (below).
+> The `patches/` are **diffs** against HP's stock webOS 3.0.5 (`Nova-HP-Topaz` build 86) —
+> apply them to the files already on the device. `service-stock/` is the small exception:
+> pristine copies of the palmprofile service files the ipk patches, checked in so `postinst`
+> can seed a correct `<file>.stock` backup at install time instead of snapshotting whatever
+> happens to already be live (wrong on any device with a prior install — see `ipk/postinst`).
+> Fair game to check in as real source rather than a diff: HP open-sourced webOS in 2012.
+> The installer `.uImage` is **not** included — extract it from your own `devicetoolAIO.jar`
+> (below).
 
 ## Layout
 
@@ -39,6 +44,9 @@ webos/
 │   ├── UpdateUsernameCommandAssistant.js    # ours, not HP's: palm://com.palm.accountservices/updateUsername
 │   ├── SyncDeviceNameCommandAssistant.js    # ours: reads the local device name, publishes it to the account
 │   └── SignOutCommandAssistant.js           # ours: revokes the token server-side, then clears it locally
+├── service-stock/                   # pristine copies of the 8 palmprofile files patches/ touches —
+│                                     # package.sh stages these into the ipk; postinst seeds <file>.stock
+│                                     # from them (not from the live device) so uninstall restores real stock
 ├── app/
 │   ├── appinfo.json                 # our app id com.palm.app.webosaccount (com.palm.* = privileged)
 │   ├── config.js                    # FirstUse.config = [palm (terms), signin]

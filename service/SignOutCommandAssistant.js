@@ -96,8 +96,14 @@ var SignOutCommandAssistant = Class.create({
 		}
 	},
 
-	// Strip the previous member's name off the local account record. Mirrors
-	// createLocalAccount's upsert, in reverse.
+	// Strip the previous member's name off every local account record.
+	// Mirrors createLocalAccount's upsert, in reverse — and shares its reason
+	// for walking *every* com.palm.palmprofile match instead of stopping at
+	// the first: on 3.1.x, activation is no longer ours, so a device can
+	// already carry more than one such row (its own OOBE-skip placeholder,
+	// plus whatever a profile restore drops in) by the time sign-out runs.
+	// Leaving an un-renamed duplicate behind means the previous member's name
+	// can still surface from whichever row a UI happens to read.
 	renameLocalAccount: function (future, revoked) {
 		var self = this;
 		var finish = function (renamed) {
@@ -111,43 +117,48 @@ var SignOutCommandAssistant = Class.create({
 		try {
 			var listFuture = PalmCall.call("palm://com.palm.service.accounts/", "listAccounts", {});
 			listFuture.then(function () {
-				var existing = null, i, res = null;
+				var matches = [], i, res = null;
 				try { res = listFuture.result; } catch (e) {
 					ServiceLog.log("signOut: listAccounts failed: " + e);
 				}
 				if (res && res.results) {
 					for (i = 0; i < res.results.length; i++) {
 						if (res.results[i].templateId === "com.palm.palmprofile") {
-							existing = res.results[i];
-							break;
+							matches.push(res.results[i]);
 						}
 					}
 				}
-				if (!existing) {
+				if (matches.length === 0) {
 					ServiceLog.log("signOut: no palmprofile account to rename.");
 					finish(false);
 					return;
 				}
-				if (existing.username === SignOutCommandAssistant.LOCAL_USER) {
-					finish(true);   // already neutral
-					return;
-				}
-				var modFuture = PalmCall.call("palm://com.palm.service.accounts/", "modifyAccount", {
-					"accountId": existing._id,
-					"object": { "username": SignOutCommandAssistant.LOCAL_USER }
-				});
-				modFuture.then(function () {
-					var ok = true;
-					try {
-						modFuture.result;
-					} catch (e) {
-						ok = false;
-						// Worth being loud about: the sign-out otherwise looks
-						// complete while the previous owner's name is still on screen.
-						ServiceLog.log("signOut: could NOT rename the local account: " + e);
+
+				var idx = 0, allOk = true;
+				var renameNext = function () {
+					if (idx >= matches.length) { finish(allOk); return; }
+					var existing = matches[idx++];
+					if (existing.username === SignOutCommandAssistant.LOCAL_USER) {
+						renameNext();   // already neutral
+						return;
 					}
-					finish(ok);
-				});
+					var modFuture = PalmCall.call("palm://com.palm.service.accounts/", "modifyAccount", {
+						"accountId": existing._id,
+						"object": { "username": SignOutCommandAssistant.LOCAL_USER }
+					});
+					modFuture.then(function () {
+						try {
+							modFuture.result;
+						} catch (e) {
+							allOk = false;
+							// Worth being loud about: the sign-out otherwise looks
+							// complete while the previous owner's name is still on screen.
+							ServiceLog.log("signOut: could NOT rename the local account (" + existing._id + "): " + e);
+						}
+						renameNext();
+					});
+				};
+				renameNext();
 			});
 		} catch (e) {
 			ServiceLog.log("signOut: rename step failed outright: " + e);

@@ -151,7 +151,7 @@
  		token.authenticatedTime = authenticateInfo.authenticationTime;
  		token.tokenexpireTime = authenticateInfo.expirationTime;
  		token.state = authenticateInfo.accountState;
-@@ -242,40 +312,80 @@
+@@ -242,40 +312,97 @@
  	},
  		
  	createLocalAccount: function (username, onComplete) {
@@ -181,22 +181,7 @@
 -				
 -				var fileUtil = new FileUtil();
 -				fileUtil.createAccountCreatedFlag();
-+		// webOS Archive: UPSERT — never create a second parallel palmprofile
-+		// account. If one already exists (e.g. the "Dr. Skipped Firstuse"
-+		// activation-bypass row), rename it in place via modifyAccount; deleting
-+		// it would run the accounts-service teardown cascade, and duplicates
-+		// confuse deviceinfo. Only create when no palmprofile account exists.
-+		var listFuture = PalmCall.call("palm://com.palm.service.accounts/", "listAccounts", {});
-+		listFuture.then(function(){
-+			var existing = null, i, res = listFuture.result;
-+			if (!listFuture.exception && res && res.results) {
-+				for (i = 0; i < res.results.length; i++) {
-+					if (res.results[i].templateId === "com.palm.palmprofile") {
-+						existing = res.results[i];
-+						break;
-+					}
-+				}
- 			}
+-			}
 -		}
 -		
 -		onComplete();
@@ -204,15 +189,80 @@
 -		
 -		
 -		
-+			if (existing) {
++		// webOS Archive: UPSERT — never create a second parallel palmprofile
++		// account. On 3.0.5 our own OOBE patch was the only thing that could
++		// leave a pre-existing row (the "Dr. Skipped Firstuse" bypass), so
++		// finding the first match was enough. On 3.1.x activation is no
++		// longer ours: its own OOBE-skip can leave a placeholder row we don't
++		// control (seen in the wild as "webOS User"), and a profile restore
++		// can drop in a second, real one — so more than one com.palm.palmprofile
++		// row can exist by the time we get here. Rename EVERY matching row
++		// into agreement rather than stopping at the first, so no duplicate
++		// is ever left showing a stale/generic name to whichever app reads
++		// it. Deleting the extras is deliberately avoided: that runs the
++		// accounts-service teardown cascade, and a device with fewer
++		// palmprofile rows than it started with is untested territory (see
++		// signOut's identical choice not to delete).
++		var listFuture = PalmCall.call("palm://com.palm.service.accounts/", "listAccounts", {});
++		listFuture.then(function(){
++			var matches = [], i, res = listFuture.result;
++			if (!listFuture.exception && res && res.results) {
++				for (i = 0; i < res.results.length; i++) {
++					if (res.results[i].templateId === "com.palm.palmprofile") {
++						matches.push(res.results[i]);
++					}
++				}
++			}
++
++			if (matches.length === 0) {
++				var account = {
++					"templateId": "com.palm.palmprofile",
++					"capabilityProviders": [
++						{"id": "com.palm.palmprofile.contacts"},
++						{"id": "com.palm.palmprofile.calendar"},
++						{"id": "com.palm.palmprofile.tasks"},
++						{"id": "com.palm.palmprofile.memos"},
++						{"id": "com.palm.palmprofile.sms"},
++						{"id": "com.palm.palmprofile.voice"},
++						{"id": "com.palm.palmprofile.localfilestore"}
++					],
++					"username": username,
++					"credentials": {}
++				};
++				ServiceLog.log("Creating a palmprofile account with username:" + username);
++
++				var acctFuture = PalmCall.call("palm://com.palm.service.accounts/", "createAccount", account);
++				acctFuture.then(function(){
++					if (acctFuture.exception){
++						ServiceLog.error("----------- local acct creation failed ------------" + JSON.stringify(acctFuture.exception));
++					}else{
++						if (acctFuture.result) {
++							ServiceLog.log("----------- local acct created successfully ------------" + JSON.stringify(acctFuture.result));
++
++							var fileUtil = new FileUtil();
++							fileUtil.createAccountCreatedFlag();
++						}
++					}
++					onComplete();
++				});
++				return;
++			}
++
++			// Walk every match, one modifyAccount at a time (no fan-out helper on
++			// this Future implementation) — a stray duplicate must never be left
++			// un-renamed just because an earlier one already matched.
++			var idx = 0;
++			var renameNext = function() {
++				if (idx >= matches.length) { onComplete(); return; }
++				var existing = matches[idx++];
 +				if (existing.username === username || username === "Dr. Skipped Firstuse") {
 +					// The default/bypass create must never rename a real signed-in
 +					// account — any existing row already satisfies activation.
 +					ServiceLog.log("WOSA: palmprofile account already present (" + existing.username + ") — no rename needed.");
-+					onComplete();
++					renameNext();
 +					return;
 +				}
-+				ServiceLog.log("WOSA: renaming existing palmprofile account '" + existing.username + "' -> '" + username + "'");
++				ServiceLog.log("WOSA: renaming existing palmprofile account '" + existing.username + "' -> '" + username + "' (" + existing._id + ")");
 +				var modFuture = PalmCall.call("palm://com.palm.service.accounts/", "modifyAccount", {
 +					"accountId": existing._id,
 +					"object": {"username": username}
@@ -225,42 +275,10 @@
 +						var fileUtil = new FileUtil();
 +						fileUtil.createAccountCreatedFlag();
 +					}
-+					onComplete();
++					renameNext();
 +				});
-+				return;
-+			}
-+
-+			var account = {
-+				"templateId": "com.palm.palmprofile",
-+				"capabilityProviders": [
-+					{"id": "com.palm.palmprofile.contacts"},
-+					{"id": "com.palm.palmprofile.calendar"},
-+					{"id": "com.palm.palmprofile.tasks"},
-+					{"id": "com.palm.palmprofile.memos"},
-+					{"id": "com.palm.palmprofile.sms"},
-+					{"id": "com.palm.palmprofile.voice"},
-+					{"id": "com.palm.palmprofile.localfilestore"}
-+				],
-+				"username": username,
-+				"credentials": {}
 +			};
-+			ServiceLog.log("Creating a palmprofile account with username:" + username);
-+
-+			var acctFuture = PalmCall.call("palm://com.palm.service.accounts/", "createAccount", account);
-+			acctFuture.then(function(){
-+			if (acctFuture.exception){
-+				ServiceLog.error("----------- local acct creation failed ------------" + JSON.stringify(acctFuture.exception));
-+			}else{
-+				if (acctFuture.result) {
-+					ServiceLog.log("----------- local acct created successfully ------------" + JSON.stringify(acctFuture.result));
-+
-+					var fileUtil = new FileUtil();
-+					fileUtil.createAccountCreatedFlag();
-+				}
-+			}
-+
-+			onComplete();
-+			});
++			renameNext();
 +		});
  	},
  	

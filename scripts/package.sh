@@ -52,6 +52,13 @@ novacom run file:///bin/cat -- "$SVC/handlers/SignOutCommandAssistant.js"       
 novacom run file:///bin/cat -- "$SVC/services.json"                                > "$BUILD/data/$STAGE_REL/service/services.json"
 novacom run file:///bin/cat -- "$SVC/sources.json"                                 > "$BUILD/data/$STAGE_REL/service/sources.json"
 
+echo ">> 2b) stage genuine HP stock ($HERE/service-stock) for postinst to seed .stock from"
+# Not pulled from the device — the device's copy is already patched. postinst
+# uses these to back up the ORIGINAL files the first time it runs, instead of
+# snapshotting whatever happens to be live (which is wrong on any device that
+# already carries an earlier install). See ipk/postinst.
+cp -r "$HERE/service-stock" "$BUILD/data/$STAGE_REL/service-stock"
+
 echo ">> 3) sanity-check the payload actually carries our patches"
 grep -q "updateCompletePage" "$BUILD/data/$STAGE_REL/app/FirstUse.js"
 grep -q "WOSA" "$BUILD/data/$STAGE_REL/app/source/tnc/Palm.js"
@@ -68,6 +75,11 @@ grep -q "dbFuture.exception" "$BUILD/data/$STAGE_REL/service/UpdateUsernameComma
     echo "!! UpdateUsernameCommandAssistant.js on-device is missing the async cache-failure fix — redeploy first" >&2; exit 1; }
 grep -q "syncDeviceName" "$BUILD/data/$STAGE_REL/service/services.json"
 grep -q "signOut" "$BUILD/data/$STAGE_REL/service/services.json"
+# service-stock must be genuinely pristine — postinst trusts it as the backup
+# source for prerm's restore. A WOSA marker here means someone accidentally
+# copied a patched file into service-stock/ instead of real HP stock.
+grep -rl "WOSA" "$BUILD/data/$STAGE_REL/service-stock/" >/dev/null && {
+    echo "!! service-stock/ contains a patched file, not pristine HP stock" >&2; exit 1; } || true
 # The localized appinfo files OVERRIDE the base, so a version that only got bumped
 # in the base ships an app that reports the OLD version while the ipk claims the new
 # one — and the self-updater compares exactly those two. Fail the build instead.

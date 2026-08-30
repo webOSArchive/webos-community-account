@@ -37,7 +37,16 @@
  		]},
  				
  		{kind: "Scrim", layoutKind: "VFlexLayout", align: "center", pack: "center", components: [
-@@ -130,11 +138,14 @@
+@@ -75,7 +83,6 @@
+ 			{name: "getServerURL", method: "getURLForTerms", onSuccess: "getTerms", onFailure: "getServerURLFailure"},
+ 			{name:"getTermsAndConditions", method:"getTermsAndConditions", onResponse:"getTermsAndConditionsResponse"},
+-		]},
++		]}
+-		{kind: "StartOver"}
+ 	],
+ 	
+ 	initialCallMade: false,
+@@ -130,11 +137,14 @@
      		console.info("Already did the deed...2");
  		} else {
  	  	    this.getTermsResponseCalled = false;
@@ -55,7 +64,7 @@
  		}
      },
      
-@@ -170,7 +181,10 @@
+@@ -170,7 +180,10 @@
      },
      
  	getTerms: function(inSender, inResponse){
@@ -67,7 +76,7 @@
      	enyo.application.FirstUse.setServerURL(url);
  		var lang = enyo.g11n.currentLocale().getLanguage();
  		console.info("Getting terms from: " + url);
-@@ -182,24 +196,35 @@
+@@ -182,24 +195,35 @@
  		this.getTermsResponseCalled = true;
  
  		if(inResponse.returnValue) {
@@ -108,7 +117,7 @@
  		if (this.$.palmCheckBox.getChecked()) {
  			this.doFinish();
  		} else {
-@@ -216,13 +241,27 @@
+@@ -216,13 +240,27 @@
  	palmDeclined: function(){
  		this.$.palmPopup.close();
  	},

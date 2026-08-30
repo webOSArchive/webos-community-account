@@ -22,11 +22,17 @@ mount -o remount,rw / || exit 1
 
 # 1) palmprofile service -> webOS Archive backend (keep pristine copies once).
 # services.json/sources.json are in this list because our updateUsername method
-# only exists on the bus if both manifests name it.
-for f in utils/palm_profile_util.js handlers/LoginProfileCommandAssistant.js handlers/IsEmailAvailableCommandAssistant.js handlers/GetTermsAndConditionsCommandAssistant.js handlers/GetTokenCommandAssistant.js services.json sources.json; do
-    if [ -f "$SVC/$f" ] && [ ! -f "$SVC/$f.stock" ]; then
-        cp "$SVC/$f" "$SVC/$f.stock"
-    fi
+# only exists on the bus if both manifests name it. GetAccountInfoAggregateAssistant.js
+# is here too — a prior release patched it live but never backed it up, so prerm
+# could never restore it.
+#
+# The .stock seed comes from $STAGE/service-stock/, genuine HP stock shipped in
+# this package, NOT from whatever is currently live at $SVC/$f. A device that
+# already carries an earlier install (or a hand patch) before this one runs would
+# otherwise have its already-modified file captured as "stock" — seen in the wild
+# during testing, and it silently breaks prerm's restore-to-stock ever after.
+for f in utils/palm_profile_util.js handlers/LoginProfileCommandAssistant.js handlers/IsEmailAvailableCommandAssistant.js handlers/GetTermsAndConditionsCommandAssistant.js handlers/GetTokenCommandAssistant.js handlers/GetAccountInfoAggregateAssistant.js services.json sources.json; do
+    [ -f "$SVC/$f.stock" ] || cp "$STAGE/service-stock/$f" "$SVC/$f.stock" || exit 1
     cp "$STAGE/service/$(basename "$f")" "$SVC/$f" || exit 1
 done
 # Purely ours — no stock file to preserve, so prerm deletes them outright. These

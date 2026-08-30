@@ -8,7 +8,7 @@ SVC=/usr/palm/services/com.palm.service.palmprofile
 
 mount -o remount,rw / || exit 0
 
-for f in utils/palm_profile_util.js handlers/LoginProfileCommandAssistant.js handlers/IsEmailAvailableCommandAssistant.js handlers/GetTermsAndConditionsCommandAssistant.js handlers/GetTokenCommandAssistant.js services.json sources.json; do
+for f in utils/palm_profile_util.js handlers/LoginProfileCommandAssistant.js handlers/IsEmailAvailableCommandAssistant.js handlers/GetTermsAndConditionsCommandAssistant.js handlers/GetTokenCommandAssistant.js handlers/GetAccountInfoAggregateAssistant.js services.json sources.json; do
     if [ -f "$SVC/$f.stock" ]; then
         cp "$SVC/$f.stock" "$SVC/$f"
     fi
