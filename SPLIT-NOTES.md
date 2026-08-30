@@ -1,6 +1,9 @@
 # Splitting OOBE from post-OOBE account management
 
-**Status:** design notes only — no code changes on this branch yet.
+**Status:** the account app (`com.palm.app.webosaccount`) is built, tested, and
+fixed against real 3.1.0 activation behavior — see the 2026-08-30 entry below.
+Landed on `main` directly (commit `8e4aa41`), not on the
+`split-oobe-and-account-app` branch these notes were originally written on.
 **Date:** 2026-08-18. **Branch:** `split-oobe-and-account-app`.
 
 ## The decision
@@ -88,12 +91,18 @@ flakiness is latent in stock webOS, not something CE introduced.
   place, keeping `.stock` backups restored by `prerm`. On a CE image the service
   patches are already baked, so the postinst's job shrinks to installing the app
   — possibly making a plain cryptofs app install viable. Decide which.
+  — **2026-08-30:** the current Preware/ipkgservice + rootfs-patch delivery was
+  tested and works on both 3.0.5 and 3.1.0 as-is (3.1.0's own baked-in service
+  patch gets overwritten by ours on install, no conflict observed). Whether a
+  simpler cryptofs-only install is worth pursuing on a CE image is still open.
 - **Identity.** `com.palm.app.webosaccount` (what `app/appinfo.json` already
   says, and what 1.1.3 shipped). Keep it.
 - **Scope.** Sign in / out, change name / email / password, pick a public
   username, list devices on the account. Explicitly *not* language selection,
   Start Over, device naming as part of a wipe, or anything that touches the
   Wi-Fi profile.
+  — **2026-08-30:** `com.palm.app.webosaccount` was still shipping the live,
+  unpatched Start Over button until this session — fixed, see below.
 - **Sharing with OOBE.** The two apps share most cards today. Decide between a
   common source tree with two build targets and two genuinely separate trees.
   A shared tree keeps fixes in one place but reintroduces the risk that an
@@ -101,6 +110,92 @@ flakiness is latent in stock webOS, not something CE introduced.
   meant to make structurally impossible.
 - **Entry point.** With OOBE hidden, a user who skips setup needs a route to the
   account app: catalog install, plus wherever Settings > Accounts should link.
+
+## 2026-08-30 — six-scenario test pass, three bugs found and fixed
+
+Real-hardware pass covering the three post-OOBE cases that matter for the
+account app: proven 3.0.5, and two 3.1.0 shapes (RC's own built-in OOBE now
+owns activation there — this repo doesn't touch it).
+
+**Scenarios run, all pass on `1.1.15`:**
+
+1. Fresh 3.1.0 → skip OOBE → restore a 3.0.5 backup → install → sign in to an
+   existing account. Originally **broken** — this is where the duplicate-account
+   bug (below) was found. Fixed and re-verified.
+2. Fresh 3.1.0 → skip OOBE → install → sign in, no restore. Isolates that the
+   duplicate only shows up with a restore in the picture (see below).
+3. Fresh 3.1.0 → sign in during OOBE → install/open the app. Confirms the app
+   leaves an already-correct account untouched (no stray `createLocalAccount`
+   call at all when nothing needs changing).
+4. Fresh 3.1.0 → skip OOBE → install → create a *new* account.
+5. Fresh 3.1.0 → skip OOBE → install → sign in → sign out → sign in to a
+   *different* account. Run twice (once on 1.1.14, once on a from-scratch
+   1.1.15 flash) — clean both times.
+6. Fresh 3.0.5 (community-OTA curl applied) → sign in → the original
+   proven-in-prod path, re-verified against the current fixed build to confirm
+   nothing regressed.
+
+**Bug 1 — duplicate `com.palm.palmprofile` accounts on 3.1.0.**
+`createLocalAccount` (`palm_profile_util.js`) and `SignOutCommandAssistant`
+both found "the" palmprofile account by taking the *first*
+`templateId === "com.palm.palmprofile"` match from `listAccounts` and stopping.
+That was safe on 3.0.5, where our own OOBE patch was the only thing that could
+leave a pre-existing row (the `"Dr. Skipped Firstuse"` bypass). On 3.1.0,
+activation is the RC's own and out of our control — its OOBE-skip leaves its
+own placeholder row (seen as `"webOS User"`), and a profile restore can drop
+in a second, real one. First-match-wins then silently orphans whichever row it
+doesn't touch: confirmed via `listAccounts` showing two rows (`"codepoet"` and
+`"webOS User"`) after a sign-in that logged "no rename needed" against the
+wrong one. Fix: both places now walk *every* match and rename each into
+agreement, rather than stopping at the first. Deliberately does not delete the
+extras — that runs the accounts-service teardown cascade, untested territory.
+
+**Bug 2 — reachable "Start Over" button, exactly the class this doc already
+called out.** `StartOver.js` (deletes the connected Wi-Fi profile) shipped
+completely unpatched in `com.palm.app.webosaccount` — reachable from the terms
+and sign-in cards, live-tested by accident (wiped a device's Wi-Fi, palm
+profile untouched only because `Language.js` isn't in this app's `config.js`
+card list). Fixed: `{kind: "StartOver"}` removed from both `Palm.js` and
+`Signin.js`. `FirstUse.js`'s *other* route to the same behavior
+(`StartOverFU` / `wifiPopupCancelDialogStartOver`, off the WiFiPopup cancel
+dialog) is still there, unconfirmed whether it's reachable in this app's flow
+— open item below.
+
+**Bug 3 — `.stock` backup corruption, found on two separate test devices.**
+`postinst`'s `[ ! -f "$SVC/$f.stock" ] && cp "$SVC/$f" "$SVC/$f.stock"`
+snapshots whatever is *currently live* as "pristine." On any device that
+already carries a prior install (true of both 3.1.0 test devices this
+session), that's already-patched content — `prerm`'s restore-to-stock is
+silently broken from that point on. Also, `GetAccountInfoAggregateAssistant.js`
+was patched live with no backup entry in the loop at all, on any device, ever.
+Fixed: genuine HP stock for all 8 files now lives in `service-stock/` (checked
+into the repo — HP open-sourced webOS in 2012, so this isn't the same
+copyright concern the diffs-not-source convention was guarding against),
+`package.sh` stages it into the ipk, and `postinst` seeds `.stock` from that
+instead of from live. Verified byte-exact against genuine stock (pulled fresh
+from a webOS Doctor jar) on both a 3.1.0 and a 3.0.5 device after install.
+
+**Also new this session:** the reference ipk build path no longer requires a
+live device at all — `patches/*.patch` apply with real `patch` straight
+against stock extracted from a webOS Doctor jar's
+`nova-cust-image-topaz.rootfs.tar.gz`, which is how `1.1.13`–`1.1.15` were
+actually built and how the createLocalAccount fix got its first real
+apply-against-genuine-stock verification (as opposed to hand-editing an
+already-patched device file, which is how the *first* attempt at this fix
+went and is worth avoiding next time — see the ipk/postinst-style approach
+instead).
+
+**Open items, not yet acted on:**
+- `FirstUse.js`'s WiFiPopup-cancel path to the same wifi-delete behavior
+  (Bug 2, second path) — reachability in this app unconfirmed.
+- Self-update (`Updater-Helper.js`) path from an old buggy version to a fixed
+  one is untested — only fresh Preware installs were exercised.
+- `prerm`/uninstall itself was never actually run this session, only reasoned
+  about; not a priority per current scope, but worth knowing if it ever
+  becomes one.
+- `com.palm.app.accounts` (separate repo, the actual settings-app UI) wasn't
+  independently exercised — coverage here is via `listAccounts`/`luna-send`
+  plus on-screen confirmation, not that app's own code paths.
 
 ## Related
 
