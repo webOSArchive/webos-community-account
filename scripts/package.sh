@@ -14,7 +14,10 @@
 # the target device (app -> rootfs, service files patched with .stock backups).
 #
 # IMPORTANT: install via Preware / org.webosinternals.ipkgservice (this is what
-# the on-device Museum app uses) — the stock appinstaller does not run postinst.
+# the on-device Museum app uses). The stock App Installer only runs
+# pmPostInstall.script / pmPreRemove.script ar members, which this ipk doesn't
+# ship (see the header of ipk/postinst for why it mustn't), so through that path
+# the payload stages and nothing activates.
 #
 # Usage: deploy.sh first (and ideally verify sign-in), then: scripts/package.sh
 set -e
@@ -36,6 +39,9 @@ mkdir -p "$BUILD/apptmp"
 tar xzf "$BUILD/app.tgz" -C "$BUILD/apptmp"
 mv "$BUILD/apptmp/$APPID" "$BUILD/data/$STAGE_REL/app"
 find "$BUILD/data" -name '*.stock' -delete   # deploy.sh leaves pristine copies next to patched files
+# scripts/copy_all.sh is HP's own developer push script, inherited from the
+# firstuse clone. Nothing in the app references it, so don't ship it.
+rm -rf "$BUILD/data/$STAGE_REL/app/scripts"
 
 echo ">> 2) pull patched service files from device"
 novacom run file:///bin/cat -- "$SVC/utils/palm_profile_util.js"                   > "$BUILD/data/$STAGE_REL/service/palm_profile_util.js"
@@ -80,6 +86,13 @@ grep -q "signOut" "$BUILD/data/$STAGE_REL/service/services.json"
 # copied a patched file into service-stock/ instead of real HP stock.
 grep -rl "WOSA" "$BUILD/data/$STAGE_REL/service-stock/" >/dev/null && {
     echo "!! service-stock/ contains a patched file, not pristine HP stock" >&2; exit 1; } || true
+# postinst's is_patched() uses these markers to spot a bad .stock capture and
+# replace it from service-stock/, so service-stock/ must never carry one.
+{ grep -rli "webos archive" "$BUILD/data/$STAGE_REL/service-stock/" ||
+  grep -l "updateUsername" "$BUILD/data/$STAGE_REL/service-stock/services.json" ||
+  grep -l "UpdateUsernameCommandAssistant" "$BUILD/data/$STAGE_REL/service-stock/sources.json"; } >/dev/null && {
+    echo "!! service-stock/ carries a patch marker postinst would treat as a bad backup" >&2; exit 1; } || true
+[ -d "$BUILD/data/$STAGE_REL/app/scripts" ] && { echo "!! app/scripts/ is still in the payload" >&2; exit 1; } || true
 # The localized appinfo files OVERRIDE the base, so a version that only got bumped
 # in the base ships an app that reports the OLD version while the ipk claims the new
 # one — and the self-updater compares exactly those two. Fail the build instead.

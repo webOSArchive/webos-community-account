@@ -74,7 +74,8 @@ dev 'kill $(ps | grep "[c]om.palm.service.palmprofile" | awk "{print \$1}") 2>/d
 # written against the HP binary and will NOT apply to the LG tree — removed, see git history.
 
 echo ">> 2) build app: clone firstuse -> $APPID"
-dev "rm -rf $APPDIR && cp -r $FU $APPDIR && echo cloned"
+# scripts/ is HP's developer push script (copy_all.sh); the app never uses it.
+dev "rm -rf $APPDIR && cp -r $FU $APPDIR && rm -rf $APPDIR/scripts && echo cloned"
 apply "$APPDIR/FirstUse.js"             "$PATCHES/FirstUse.js.patch"
 apply "$APPDIR/source/signin/Signin.js" "$PATCHES/Signin.js.patch"
 apply "$APPDIR/source/tnc/Palm.js"      "$PATCHES/Palm.js.patch"

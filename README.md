@@ -116,8 +116,15 @@ pristine `<file>.stock` backups. `prerm` restores stock and removes the app.
 
 **Install path matters:** the on-device Museum app installs by handing the IPK URL to
 Preware (`org.webosinternals.preware {type:"install"}`), whose ipkgservice runs install
-scripts. The **stock** appinstaller does NOT run postinst — the package would stage but
-never activate. List it in the catalog so the Museum/Preware path is used.
+scripts. The **stock** App Installer only runs `pmPostInstall.script`/`pmPreRemove.script`
+ar members, which this IPK deliberately doesn't ship (it would run them inside LunaSysMgr,
+where the scripts' blocking `luna-send` deadlocks it), so through that path the package
+would stage but never activate. List it in the catalog so the Museum/Preware path is used.
+
+The postinst refuses (before touching anything) unless the device reports HP webOS 3.0.5
+or webOS CE 3.1 or later (no upper bound), and unless all eight palmprofile files it patches exist; prerm does
+nothing on any other build. An existing `<file>.stock` that carries one of our patch
+markers (a bad capture from an earlier release) is replaced from `service-stock/`.
 
 ipkg format gotcha: members inside `control.tar.gz`/`data.tar.gz` MUST be `./`-prefixed
 (`./control`, `./usr/...`) — webOS's ipkg 0.99 rejects the archive (rc 22) otherwise.

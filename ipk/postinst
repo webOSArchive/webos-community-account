@@ -1,8 +1,15 @@
 #!/bin/sh
 # webOS Account (com.palm.app.webosaccount) installer.
 # Runs as ROOT via Preware / org.webosinternals.ipkgservice (the Museum app's
-# install path). The stock appinstaller does NOT run this script — this package
-# must be installed through Preware/ipkgservice.
+# install path), which runs the ipk's control.tar.gz postinst/prerm.
+#
+# The stock App Installer (com.palm.appinstaller: palm-install, the device's own
+# installer) only runs pmPostInstall.script / pmPreRemove.script ar members, and
+# this ipk ships none. So through that path the payload is unpacked under
+# /media/cryptofs/apps and nothing else happens: no app, no service patch. Don't
+# "fix" that by adding pm*.script members: the App Installer runs those inside
+# LunaSysMgr, where the blocking luna-send rescan at the end of these scripts
+# would deadlock it. Install through Preware/ipkgservice.
 #
 # Installs the account app into the rootfs (/usr/palm/applications — same as a
 # system app; the com.palm.* id needs no cryptofs quirks there) and patches the
@@ -12,13 +19,53 @@
 APPID=com.palm.app.webosaccount
 STAGE=/media/cryptofs/apps/usr/palm/webosarchive/webosaccount
 SVC=/usr/palm/services/com.palm.service.palmprofile
+FILES="utils/palm_profile_util.js handlers/LoginProfileCommandAssistant.js handlers/IsEmailAvailableCommandAssistant.js handlers/GetTermsAndConditionsCommandAssistant.js handlers/GetTokenCommandAssistant.js handlers/GetAccountInfoAggregateAssistant.js services.json sources.json"
 
 if [ ! -d "$STAGE/app" ]; then
     echo "webosaccount: staging payload missing at $STAGE" >&2
     exit 1
 fi
 
+# 0) Only HP webOS 3.0.5 and webOS CE 3.1 or later (TouchPad-only). The patched
+# service files and service-stock/ come from 3.0.5, and prerm puts service-stock/
+# back, so on an older build (a 1.x/2.x phone, 3.0.0-3.0.4) uninstalling would
+# leave the wrong files behind. There is deliberately no upper bound: CE 3.2 and
+# later keep this service, and the file check below still catches one that doesn't. The catalog may
+# gate this too, but nothing on the device enforces that, so check here, before
+# anything is touched. prerm has the same check.
+OSINFO=`grep PRODUCT_VERSION_STRING /etc/palm-build-info 2>/dev/null | head -n 1`
+OSVER=`echo "$OSINFO" | sed -e 's/.*[^0-9.]\([0-9][0-9]*\.[0-9][0-9.]*\).*/\1/'`
+case "$OSVER" in
+    3.0.5) ;;
+    [12].*|3.0.*) OSVER=old ;;
+    [0-9]*) ;;
+    *) OSVER=old ;;
+esac
+case "$OSVER" in
+    old)
+        echo "webosaccount: for HP webOS 3.0.5 and webOS CE 3.1 or later only (found '$OSINFO'). Not installing." >&2
+        exit 1
+        ;;
+esac
+for f in $FILES; do
+    if [ ! -f "$SVC/$f" ]; then
+        echo "webosaccount: $SVC/$f not found, this palmprofile service is not the one this package patches. Not installing." >&2
+        exit 1
+    fi
+done
+
 mount -o remount,rw / || exit 1
+
+# is_patched <file> <name>: true if <file> carries one of our patches. Every
+# version of every patch in patches/ adds one of these markers, and none of HP's
+# originals in service-stock/ contains one (package.sh checks that).
+is_patched() {
+    case "$2" in
+        services.json) grep -q "updateUsername" "$1" ;;
+        sources.json)  grep -q "UpdateUsernameCommandAssistant" "$1" ;;
+        *)             grep -qi "webos archive" "$1" ;;
+    esac
+}
 
 # 1) palmprofile service -> webOS Archive backend (keep pristine copies once).
 # services.json/sources.json are in this list because our updateUsername method
@@ -31,7 +78,15 @@ mount -o remount,rw / || exit 1
 # already carries an earlier install (or a hand patch) before this one runs would
 # otherwise have its already-modified file captured as "stock" — seen in the wild
 # during testing, and it silently breaks prerm's restore-to-stock ever after.
-for f in utils/palm_profile_util.js handlers/LoginProfileCommandAssistant.js handlers/IsEmailAvailableCommandAssistant.js handlers/GetTermsAndConditionsCommandAssistant.js handlers/GetTokenCommandAssistant.js handlers/GetAccountInfoAggregateAssistant.js services.json sources.json; do
+# An existing .stock is kept, unless it is one of those bad captures (it carries
+# our patch): then it's replaced, so devices that got one from an earlier release
+# are repaired too. On CE that also replaces a capture of CE's own built-in patch,
+# the same thing a fresh install there gets.
+for f in $FILES; do
+    if [ -f "$SVC/$f.stock" ] && is_patched "$SVC/$f.stock" "$f"; then
+        echo "webosaccount: $SVC/$f.stock is a patched copy, replacing it with the original."
+        rm -f "$SVC/$f.stock"
+    fi
     [ -f "$SVC/$f.stock" ] || cp "$STAGE/service-stock/$f" "$SVC/$f.stock" || exit 1
     cp "$STAGE/service/$(basename "$f")" "$SVC/$f" || exit 1
 done

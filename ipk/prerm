@@ -5,10 +5,28 @@
 
 APPID=com.palm.app.webosaccount
 SVC=/usr/palm/services/com.palm.service.palmprofile
+FILES="utils/palm_profile_util.js handlers/LoginProfileCommandAssistant.js handlers/IsEmailAvailableCommandAssistant.js handlers/GetTermsAndConditionsCommandAssistant.js handlers/GetTokenCommandAssistant.js handlers/GetAccountInfoAggregateAssistant.js services.json sources.json"
+
+# Same check as postinst: on any other build postinst refused and changed
+# nothing, so there is nothing here to undo.
+OSINFO=`grep PRODUCT_VERSION_STRING /etc/palm-build-info 2>/dev/null | head -n 1`
+OSVER=`echo "$OSINFO" | sed -e 's/.*[^0-9.]\([0-9][0-9]*\.[0-9][0-9.]*\).*/\1/'`
+case "$OSVER" in
+    3.0.5) ;;
+    [12].*|3.0.*) OSVER=old ;;
+    [0-9]*) ;;
+    *) OSVER=old ;;
+esac
+case "$OSVER" in
+    old)
+        echo "webosaccount: not HP webOS 3.0.5 or webOS CE 3.1 or later (found '$OSINFO'), nothing to undo."
+        exit 0
+        ;;
+esac
 
 mount -o remount,rw / || exit 0
 
-for f in utils/palm_profile_util.js handlers/LoginProfileCommandAssistant.js handlers/IsEmailAvailableCommandAssistant.js handlers/GetTermsAndConditionsCommandAssistant.js handlers/GetTokenCommandAssistant.js handlers/GetAccountInfoAggregateAssistant.js services.json sources.json; do
+for f in $FILES; do
     if [ -f "$SVC/$f.stock" ]; then
         cp "$SVC/$f.stock" "$SVC/$f"
     fi
