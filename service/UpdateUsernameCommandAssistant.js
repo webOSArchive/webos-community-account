@@ -19,6 +19,12 @@ var UpdateUsernameCommandAssistant = Class.create({
 			PalmProfileUtil.sendError(future, "INVALID_REQUEST", "username is required");
 			return;
 		}
+		// Usernames may not start with a number (required by chat). The rest of
+		// the username rules stay with the server.
+		if (/^[0-9]/.test(this.args.username)) {
+			PalmProfileUtil.sendError(future, "USERNAME_INVALID", "username must not start with a number");
+			return;
+		}
 
 		var dbService = new PalmProfileDBService();
 		var dbFuture = dbService.getAccountToken();
