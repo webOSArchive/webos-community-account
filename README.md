@@ -126,6 +126,11 @@ or webOS CE 3.1 or later (no upper bound), and unless all eight palmprofile file
 nothing on any other build. An existing `<file>.stock` that carries one of our patch
 markers (a bad capture from an earlier release) is replaced from `service-stock/`.
 
+On webOS CE (3.1 and later) no `.stock` backups are kept, and uninstalling removes only the
+app: CE ships its own community patch of the palmprofile service, and putting HP's originals
+back would point it at the dead HP backend. The service stays patched with this package's
+version, which talks to the same community backend.
+
 ipkg format gotcha: members inside `control.tar.gz`/`data.tar.gz` MUST be `./`-prefixed
 (`./control`, `./usr/...`) — webOS's ipkg 0.99 rejects the archive (rc 22) otherwise.
 

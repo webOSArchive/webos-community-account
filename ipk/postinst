@@ -27,12 +27,16 @@ if [ ! -d "$STAGE/app" ]; then
 fi
 
 # 0) Only HP webOS 3.0.5 and webOS CE 3.1 or later (TouchPad-only). The patched
-# service files and service-stock/ come from 3.0.5, and prerm puts service-stock/
-# back, so on an older build (a 1.x/2.x phone, 3.0.0-3.0.4) uninstalling would
-# leave the wrong files behind. There is deliberately no upper bound: CE 3.2 and
-# later keep this service, and the file check below still catches one that doesn't. The catalog may
-# gate this too, but nothing on the device enforces that, so check here, before
-# anything is touched. prerm has the same check.
+# service files and service-stock/ come from 3.0.5, so on an older build (a 1.x/2.x
+# phone, 3.0.0-3.0.4) neither the patch nor prerm's restore would be right. There
+# is deliberately no upper bound: CE 3.2 and later keep this service, and the file
+# check below still catches one that doesn't. The catalog may gate this too, but
+# nothing on the device enforces that, so check here, before anything is touched.
+# prerm has the same check.
+#
+# CE=1 on webOS CE. CE ships its own community patch of this service, so HP's
+# originals are the wrong thing to put back there: on CE we keep no .stock
+# backups, and prerm leaves the service patched and only removes the app.
 OSINFO=`grep PRODUCT_VERSION_STRING /etc/palm-build-info 2>/dev/null | head -n 1`
 OSVER=`echo "$OSINFO" | sed -e 's/.*[^0-9.]\([0-9][0-9]*\.[0-9][0-9.]*\).*/\1/'`
 case "$OSVER" in
@@ -46,6 +50,8 @@ case "$OSVER" in
         echo "webosaccount: for HP webOS 3.0.5 and webOS CE 3.1 or later only (found '$OSINFO'). Not installing." >&2
         exit 1
         ;;
+    3.0.5) CE=0 ;;
+    *)     CE=1 ;;
 esac
 for f in $FILES; do
     if [ ! -f "$SVC/$f" ]; then
@@ -80,17 +86,22 @@ is_patched() {
 # during testing, and it silently breaks prerm's restore-to-stock ever after.
 # An existing .stock is kept, unless it is one of those bad captures (it carries
 # our patch): then it's replaced, so devices that got one from an earlier release
-# are repaired too. On CE that also replaces a capture of CE's own built-in patch,
-# the same thing a fresh install there gets.
+# are repaired too.
+#
+# 3.0.5 only. On CE no .stock is written or repaired (see step 0); any left by an
+# earlier release are left alone, since prerm no longer reads them there.
 for f in $FILES; do
-    if [ -f "$SVC/$f.stock" ] && is_patched "$SVC/$f.stock" "$f"; then
-        echo "webosaccount: $SVC/$f.stock is a patched copy, replacing it with the original."
-        rm -f "$SVC/$f.stock"
+    if [ "$CE" = 0 ]; then
+        if [ -f "$SVC/$f.stock" ] && is_patched "$SVC/$f.stock" "$f"; then
+            echo "webosaccount: $SVC/$f.stock is a patched copy, replacing it with the original."
+            rm -f "$SVC/$f.stock"
+        fi
+        [ -f "$SVC/$f.stock" ] || cp "$STAGE/service-stock/$f" "$SVC/$f.stock" || exit 1
     fi
-    [ -f "$SVC/$f.stock" ] || cp "$STAGE/service-stock/$f" "$SVC/$f.stock" || exit 1
     cp "$STAGE/service/$(basename "$f")" "$SVC/$f" || exit 1
 done
-# Purely ours — no stock file to preserve, so prerm deletes them outright. These
+# Purely ours — no stock file to preserve, so prerm deletes them outright (on
+# 3.0.5; on CE they stay with the rest of the patched service). These
 # three are ALSO named in sources.json above, which the service reads at process
 # start; shipping the manifest entry without the file it points at is what broke
 # a from-scratch install (services.json/sources.json copied fine, these did not,
