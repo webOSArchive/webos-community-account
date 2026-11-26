@@ -1,11 +1,14 @@
 # webOS Community Account Manager
 
-On-device pieces that connect a physical webOS TouchPad (`topaz`) to an App Museum catalog
-account system. This will be used to enable Developers to manage their apps, users to provide
+On-device pieces that connect a webOS device to an App Museum catalog account system.
+Supported: the HP TouchPad (`topaz`) on HP webOS 3.0.5 or webOS CE 3.1 and later, and
+[Lunacy](#supported-platforms) (webOS apps on Android). This will be used to enable Developers to manage their apps, users to provide
 feedback (reviews, ratings) on apps, and potentially other functionality in the future.
 
-**Status:** verified working on hardware — sign in on-device with a catalog account,
-it becomes the device profile, **without wiping the device**.
+**Status:** 1.2.1, verified working on hardware (TouchPad, and Lunacy on a Galaxy Tab A7
+Lite) — sign in on-device with a catalog account, it becomes the device profile, **without
+wiping the device**. It is a standalone app launched from the Launcher, not part of first
+boot (OOBE); see `SPLIT-NOTES.md` for why the two were split.
 
 > The `patches/` are **diffs** against HP's stock webOS 3.0.5 (`Nova-HP-Topaz` build 86) —
 > apply them to the files already on the device. `service-stock/` is the small exception:
@@ -19,7 +22,7 @@ it becomes the device profile, **without wiping the device**.
 ## Layout
 
 ```
-webos/
+./
 ├── patches/                         # unified diffs against stock webOS 3.0.5 (topaz, build 86)
 │   ├── palm_profile_util.js.patch           # palmprofile SERVICE: base -> our backend (HTTPS via curlPost); upsert account; cache username
 │   ├── LoginProfileCommandAssistant.js.patch# login: skip dead LCN precheck; create local profile
@@ -28,7 +31,10 @@ webos/
 │   ├── GetTokenCommandAssistant.js.patch    # getAccountToken also returns accountUsername
 │   ├── services.json.patch                  # register updateUsername / syncDeviceName / signOut
 │   ├── sources.json.patch                   # load the three assistants below
-│   ├── FirstUse.js.patch                    # app: neuter erase/OTA/shutdown/powerdown; confirm page + Done
+│   ├── FirstUse.js.patch                    # app: neuter erase/OTA/shutdown/powerdown; completion card
+│   │                                        # (Done + Launch Accounts); existing-account probe at
+│   │                                        # launch; "No Internet Connection" dialog -> Wi-Fi Settings;
+│   │                                        # self-update check
 │   ├── Signin.js.patch                      # app: skip hanging PostSignIn OTA/backup checks;
 │   │                                        # one completion card for both sign-in and a
 │   │                                        # relaunch that finds an account already set up
@@ -59,7 +65,9 @@ webos/
 ├── scripts/
 │   ├── unlock.sh                    # reproduce deviceTool's dev-unlock + OOBE-skip (no jar run)
 │   ├── deploy.sh                    # apply patches + build the app + register it (dev workflow)
-│   └── package.sh                   # pull built app from device -> Preware-installable IPK (dist/)
+│   └── package.sh                   # build the Preware-installable IPK (dist/) from a device,
+│                                    # or on the host with --rootfs <stock rootfs .tar.gz>
+├── SPLIT-NOTES.md                   # why OOBE and the account app are separate apps; test log
 └── README.md
 ```
 
@@ -95,18 +103,47 @@ Device unlocked + booted to home, then:
 scripts/deploy.sh          # patches the service, builds com.palm.app.webosaccount, registers it
 ```
 
-Launch the app (or, eventually, a Preferences shortcut), sign in with a catalog account
-(username or email + password). On success it writes the device profile + token and closes.
+Launch **webOS Account** from the Launcher, accept the terms, sign in with a catalog
+account (username or email + password) or create one. On success it writes the device
+profile + token and shows a completion card with **Done** and **Launch Accounts**.
+
+- **Relaunching with an account already set up** skips terms and sign-in and goes straight
+  to the completion card: there is nothing left to set up, and managing the account is the
+  Accounts app's job.
+- **To sign in as a different account**, launch with `{"forceSignIn": true}` — the sign-in
+  flow is the only thing that can replace the device's account:
+  `luna-send -n 1 palm://com.palm.applicationManager/launch '{"id":"com.palm.app.webosaccount","params":{"forceSignIn":true}}'`
+- **No network:** the app no longer joins networks itself (First Use's Wi-Fi popup and
+  captive-portal handling are gone — the popup scanned every 12 s while the app was open,
+  and on Lunacy each scan raised "Cannot Load Network List"). A lost connection shows a
+  "No Internet Connection" dialog with a button to the system's Wi-Fi Settings.
+- **Self-update:** on launch it checks the Museum entry "webOS Community Account Manager"
+  (via the vendored `Updater-Helper.js`) and offers to install a newer version via Preware.
 
 ## 3. Package for distribution (Museum / Preware)
 
-The app is built on-device (we ship diffs, not HP source), so packaging pulls the
-built artifacts back off a deployed device:
+We ship diffs, not HP source, so the app has to be built from stock files somewhere.
+Either on a device, then pulled back off it:
 
 ```sh
 scripts/deploy.sh          # build + verify on the dev device first
 scripts/package.sh         # -> dist/org.webosarchive.webosaccount_<ver>_all.ipk
 ```
+
+or on the host, with no device, from HP's stock 3.0.5 rootfs
+(`nova-cust-image-topaz.rootfs.tar.gz`, out of the Doctor — what the patches are written
+against). This clones firstuse and patches the app and service files exactly as
+`deploy.sh` does; rebuilding 1.2.0 this way gave a payload identical, file for file, to the
+released 1.2.0:
+
+```sh
+scripts/package.sh --rootfs /path/to/nova-cust-image-topaz.rootfs.tar.gz
+```
+
+Either way `package.sh` sanity-checks the payload before assembling (patch markers present,
+`service-stock/` genuinely pristine, the version consistent across the base and every locale
+`appinfo.json`) and fails the build otherwise. It works with BSD tar (macOS) or GNU tar
+(Linux). The version comes from `app/appinfo.json` alone — bump it there.
 
 The IPK stages its payload under `/media/cryptofs/apps/usr/palm/webosarchive/` and a
 `postinst` (run as **root** by Preware / `org.webosinternals.ipkgservice`) replays the
@@ -120,9 +157,15 @@ ar members, which this IPK deliberately doesn't ship (it would run them inside L
 where the scripts' blocking `luna-send` deadlocks it), so through that path the package
 would stage but never activate. List it in the catalog so the Museum/Preware path is used.
 
-The postinst refuses (before touching anything) unless the device reports HP webOS 3.0.5
-or webOS CE 3.1 or later (no upper bound), and unless all eight palmprofile files it patches exist; prerm does
-nothing on any other build. An existing `<file>.stock` that carries one of our patch
+### Supported platforms
+
+The postinst refuses (before touching anything) unless the device reports HP webOS 3.0.5,
+webOS CE 3.1 or later (no upper bound), or Lunacy, and unless all eight palmprofile files
+it patches exist; prerm does nothing on any other build.
+
+**Lunacy** (webOS apps on Android) names itself in `/etc/palm-build-info` and claims no
+webOS version, but its palmprofile service is HP's 3.0.5 original, so postinst and prerm
+treat it as 3.0.5: patched with `.stock` backups, restored on removal. An existing `<file>.stock` that carries one of our patch
 markers (a bad capture from an earlier release) is replaced from `service-stock/`.
 
 On webOS CE (3.1 and later) no `.stock` backups are kept, and uninstalling removes only the
