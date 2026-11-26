@@ -1,5 +1,5 @@
---- FirstUse.js.stock6	2026-08-17 15:36:53
-+++ FirstUse.js.edited6	2026-08-17 15:37:05
+--- FirstUse.js.stock	2026-11-26 08:08:24.607169383 -0500
++++ FirstUse.js.edited	2026-11-26 08:08:24.608169375 -0500
 @@ -34,9 +34,9 @@
  		languageCode: "",
  		serverURL: "",
@@ -51,16 +51,44 @@
  		
  		{name: "SimStatusQuery", kind: "TelephonyService", method: "simStatusQuery",subscribe: true, onSuccess: "handleSimStatusQuery"},
  		{name: "PlatformQuery", kind: "TelephonyService", method: "platformQuery",subscribe: false, onSuccess: "handlePlatformQuery", onFailure: "handlePlatformQueryFail"},
-@@ -107,7 +128,7 @@
+@@ -107,28 +128,17 @@
  		]
  		},
  
 -		{name: "wifiPopup", kind: "WiFiPopup", lazy: false, onCancel: "wifiCancel", className: "popup", onLabel: rb.$L("On"), offLabel: rb.$L("Off")},
-+		{name: "wifiPopup", kind: "MyApps.FirstUse.WiFiPopup", lazy: false, onCancel: "wifiCancel", className: "popup", onLabel: rb.$L("On"), offLabel: rb.$L("Off")},
-     	{name: "captivePortalPopup", kind: "ModalDialog", lazy: true, onBeforeOpen: "initCaptivePortalPopup", onCancel: "captivePortalCancel", className: "popup", width: "100%", height:"100%",
- 			components: [
- 				{
-@@ -179,7 +200,7 @@
+-    	{name: "captivePortalPopup", kind: "ModalDialog", lazy: true, onBeforeOpen: "initCaptivePortalPopup", onCancel: "captivePortalCancel", className: "popup", width: "100%", height:"100%",
+-			components: [
+-				{
+-					 name : "capPortalCtrl",
+-					 kind : "CaptivePortalControl",
+-					 captivePortalNwInterface : "eth0",
+-					 onNetworkStatusChanged : "onCaptivePortalNetworkStatusChanged",
+-					 onChooseNewNetwork : "onCaptivePortalChooseNewNetwork",
+-					 captivePortalSuppressPopups:true,
+-					 captivePortalShowChooseNetworkButton:true
+-				}
+-			]
+-		},
+-		{name: "wifiPopupCancelDialog", kind: "ModalDialog", lazy: true, scrim:true, className: "popup",
+-		 caption: rb.$L("Setup Options"),
++		// webOS Archive: the account app no longer joins networks itself (that was First Use's
++		// job, and its Wi-Fi popup scanned for networks the whole time the app was open). When
++		// the connection is gone it says so and offers the system's own Wi-Fi settings.
++		{name: "noConnectionDialog", kind: "ModalDialog", lazy: true, scrim: true, className: "popup",
++		 caption: rb.$L("No Internet Connection"),
+ 		 components: [
+-		 	{content: rb.$L("You need a network to setup your device."), className: "enyo-text-body"}, 
+-			{kind: "Button", caption: rb.$L("Find Network"), className: 'enyo-button-affirmative', flex: 1, onclick: "wifiPopupCancelDialogFindNetwork", style: "margin-bottom:10px"},
+-			{kind: "Button", caption: rb.$L("Start Over"), className: 'enyo-button', flex: 1, onclick: "wifiPopupCancelDialogStartOver"},
++			{content: rb.$L("Connect this device to the Internet to set up your webOS Account."), className: "enyo-text-body"},
++			{kind: "Button", caption: rb.$L("Wi-Fi Settings"), className: 'enyo-button-affirmative', flex: 1, onclick: "openWiFiSettings"}
+ 		]
+ 		},
++		{name: "launchWiFiSettings", kind: "PalmService", service: "palm://com.palm.applicationManager/", method: "launch"},
+ 		{name: "StartOverFU", kind: "StartOver", showing: false},
+ 
+ 		{name: "appMenu", kind: "AppMenu", lazy: false, components: [
+@@ -179,7 +189,7 @@
  			service: "palm://com.palm.power/com/palm/power/",
  			onResponse: "pluggedInStatusInit"
  		},
@@ -69,7 +97,7 @@
  			components: [
  				{name: "powerDown", method: "machineOff", onResponse: "powerDownResponse"}
  			]
-@@ -196,9 +217,14 @@
+@@ -196,9 +206,14 @@
  			    {name: "setTimeZoneFromIP", method: "setTimeZoneFromIP", onResponse:"postTimeZoneResponse"},
  			    {name: "assignDeviceName", method: "assignDeviceName", onSuccess: "assignDeviceNameSuccess", onFailure: "assignDeviceNameFailure"},
  			    {name: "getToken", method: "getAccountToken", onResponse: "getTokenResponse"},
@@ -84,7 +112,28 @@
  		{kind: "DeviceProfileService", onFailure: "handleGenericFailure", onSuccess: "handleGenericSuccess",
  			components:[
  				{name: "getDevice", method: "getDeviceProfile", onResponse: "getDeviceResponse"},
-@@ -292,6 +318,8 @@
+@@ -237,20 +252,6 @@
+ 	        onFailure: "updateProfileFailure"
+ 	    },
+ 	    
+-	    {
+-	      kind: "WiFiService",
+-	      components: [{
+-	        name: "deleteWiFiProfile",
+-	        method: "getstatus",
+-	        onSuccess: "handleDeleteWiFiProfile",
+-	        onFailure: "handleDeleteWiFiProfile"
+-	      }, {
+-	        name: "deleteProfile",
+-	        method: "deleteprofile",
+-			onSuccess: "finishDeleteWiFiProfile",
+-			onSuccess: "finishDeleteWiFiProfile"
+-	      }]
+-	    },
+ 	      
+         {kind: "UpdateService",
+             components:[
+@@ -292,6 +293,8 @@
  	
  	create: function() {
  	    
@@ -93,11 +142,10 @@
  		this.assignDeviceNameRetry = false;
  		this.pluggedInStatusChangedInited = false;
  		this.log(typeof(inLocale));
-@@ -309,9 +337,99 @@
- 		if (enyo.application.FirstUse === undefined)
+@@ -310,7 +313,97 @@
  		{
  			enyo.application.FirstUse = this;
-+		}
+ 		}
 +		// webOS Archive: once an account exists this app has nothing left to offer —
 +		// walking the user back through terms + sign-in is just confusing. Probe for
 +		// an account first and hand off to the Accounts app if there is one.
@@ -132,7 +180,7 @@
 +			this.wosaStarted = true;   // suppress the timer fallback
 +			this.wosaShowAlreadySignedIn(inResponse);
 +			return;
- 		}
++		}
 +		console.info("WOSA: no account yet — running setup.");
 +		this.wosaStartSetup();
 +	},
@@ -176,7 +224,7 @@
 +
  		this.start();
 +		this.wosaCheckForUpdates();
- 	},
++	},
 +
 +	// webOS Archive: check the App Museum for a newer build of this app.
 +	wosaCheckForUpdates: function() {
@@ -189,11 +237,21 @@
 +		} catch (e) {
 +			console.info("WOSA: update check failed to start: " + e);
 +		}
-+	},
+ 	},
  	
  	start: function() {
- 	    
-@@ -378,17 +496,11 @@
+@@ -343,9 +436,8 @@
+ 	    console.info("Close All Popups ... ");
+ 		try {
+ 			this.$.powerPopup.close();
+-			this.$.wifiPopup.close();
++			this.$.noConnectionDialog.close();
+ 			this.$.MyCheckSim.close();
+-			this.$.captivePortalPopup.close();
+ 			this.SMSDialogCloseAll();
+ 		} catch (e) {
+ 		}
+@@ -378,17 +470,11 @@
  
  	
  	getRestoreInProgressSuccess: function(inSender, inResponse) {
@@ -216,7 +274,135 @@
  	},
  	
  	getRestoreInProgressFailure: function() {
-@@ -828,20 +940,84 @@
+@@ -570,17 +656,11 @@
+ 		
+ 		console.info("Requirement lost: " + inInfo);
+ 		if (this.config && this.config.requires && this.config.requires[inInfo]) {
+-			if (this.wifiNotFirstTime) {
+-				this.$.wifiPopup.setHeaderTitle(rb.$L("No Wi-Fi Connection"));
+-				this.$.wifiPopup.setHeaderInfo(rb.$L("Your device no longer has a Wi-Fi connection. Connect to a new network.")); 	
+-			}
+-			this.wifiNotFirstTime = true;
+ 			this.requirement = inInfo;
+-			var wifi = this.$.wifiPopup;
+-			wifi.reloadResources(inLocale);
+-			wifi.openAtCenter();
+-			wifi.start();
+-			this.wifiDialogIsOpen = true;
++			if (!this.wifiDialogIsOpen) {
++				this.$.noConnectionDialog.openAtCenter();
++				this.wifiDialogIsOpen = true;
++			}
+ 			enyo.call(this.view, "requirementLost", [inInfo]);
+ 		}
+ 	},
+@@ -592,13 +672,13 @@
+ 		}
+ 		if (this.config && this.config.requires && this.config.requires[inInfo]) {
+ 			enyo.call(this.view, "requirementRestored", [inInfo]);
+-			this.$.wifiPopup.close();
++			this.$.noConnectionDialog.close();
+ 			this.wifiDialogIsOpen = false;
+ 			enyo.call(this.view, "dataRestored", []);
+ 		}
+ 		if (this.wifiDialogIsOpen) { //just unconditionally close if we had it open: CWS-3185
+ 			this.wifiDialogIsOpen = false;
+-			this.$.wifiPopup.close();
++			this.$.noConnectionDialog.close();
+ 		}
+ 		if(this.currentServiceCall != ""){
+     		console.info("Found a pending call: " + this.currentServiceCall);
+@@ -607,39 +687,10 @@
+ 		
+ 	},
+ 	
+-	initCaptivePortalPopup: function() {
+-        this.$.capPortalCtrl.reloadResources(inLocale);
++	openWiFiSettings: function() {
++		this.$.launchWiFiSettings.call({id: "com.palm.app.wifi"});
+ 	},
+ 	
+-	onCaptivePortalNetworkStatusChanged: function(networkStatus) {
+-	    if ("captivePortal" !== networkStatus) {
+-	      //todo: doSomething
+-	    }
+-	},
+-	
+-	onCaptivePortalChooseNewNetwork: function() {
+-     	console.info("onCaptivePortalChooseNewNetwork reseting WiFi");
+-   		this.$.deleteWiFiProfile.call({});
+-  	},
+-	
+-  	 handleDeleteWiFiProfile:  function(inSource, inResponse) {
+-     	console.info("handleDeleteWiFiProfile");
+-  	    if (inResponse.returnValue && inResponse.networkInfo && inResponse.networkInfo.profileId) {
+-  	      console.log("getWifiProfile: " + inResponse.networkInfo.profileId);
+-  	      this.$.deleteProfile.call({profileId: inResponse.networkInfo.profileId});
+-  	    }
+-		this.finishDeleteWiFiProfile();
+-  	 }, 
+-	 
+-	 finishDeleteWiFiProfile: function() {
+-     	console.info("finishDeleteWiFiProfile");
+-		this.$.captivePortalPopup.close();
+-		this.isCaptivePortalOpen = false;
+-		this.$.wifiPopup.openAtCenter();
+-		this.wifiDialogIsOpen = true;
+-		this.$.wifiPopup.start();
+-	 },
+-  	
+ 	conManCallback: function(inSender, inResponse){
+ 		//Con Man will always trigger requirement for data lost/restored
+ 		//Up to the requirement lost/restored method to figure out if the current component needs data and to act accordingly
+@@ -651,19 +702,9 @@
+ 			this.setDataConnectionType("");
+ 			this.requirementLost("data");
+ 	    } else if(!inResponse.isInternetConnectionAvailable && inResponse.wifi.state === "connected" && inResponse.wan.state !== "connected" && inResponse.wifi.onInternet==="captivePortal") {
+-			if(this.wifiDialogIsOpen) {
+-				this.wifiDialogIsOpen = false;
+-				this.$.wifiPopup.close();
+-			}
+-			if(!this.isCaptivePortalOpen) {
+-				this.$.captivePortalPopup.openAt({width: 0, height: 0, top: 0, left: 0});
+-				this.isCaptivePortalOpen = true;
+-			}
++			this.requirementLost("data");
+ 		} else if(inResponse.isInternetConnectionAvailable && (inResponse.wifi.state === "connected" || inResponse.wan.state === "connected")) {
+ 			console.info("ConMan reporting internet connection: connected");
+-			if(this.isCaptivePortalOpen) {
+-				this.$.captivePortalPopup.close();
+-			}
+ 			this.setDataConnection(true);
+ 			this.setDataConnectionType(inResponse.wifi.state === "connected") ? "wifi" : "wan";
+ 			this.requirementRestored("data");
+@@ -685,26 +726,6 @@
+ 		this.SMSDialogCloseAll();
+ 	},
+ 	
+-	wifiCancel:function(){
+-		console.log("wifi dilog cancelled");
+-		//Do nothing, wait for ConMan to report connection available
+-
+-		this.$.wifiPopupCancelDialog.openAtCenter();
+-		//window.setTimeout(enyo.bind(this, function () {this.$.wifiPopupCancelDialog.openAtCenter()}, 1000)); // this is here becuase if I just call the function I can't select anything in the dialog?
+-		
+-	},
+-	wifiPopupCancelDialogStartOver:function(){
+-		console.log("wifi dilog startover");
+-		this.$.StartOverFU.restartFirstUse();
+-	},
+-	wifiPopupCancelDialogFindNetwork:function(){
+-		console.log("wifi dilog findnetwork");
+-		this.$.wifiPopupCancelDialog.close();
+-		this.$.wifiPopup.reloadResources(inLocale);
+-		this.$.wifiPopup.openAtCenter();
+-		this.$.wifiPopup.start();
+-	},
+-	
+ 	onSimCheckSuccess:function(){
+ 		console.log("onSimCheckSuccess");
+ 		this.$.MyCheckSim.close();
+@@ -828,19 +849,83 @@
  	},
  	
  	done: function(){
@@ -254,9 +440,7 @@
 +	completeDoneTap: function(){
 +		this.wosaSafeClose();
 +	},
- 
--		this.$.postLoginSettings.call();
--		this.$.removeRestoreFailedFile.call();
++
 +	closeApp: function(){
 +		// webOS Archive: only finish OOBE (mark done + reboot) when LunaSysMgr
 +		// actually launched us as the OOBE bootstrap app — it is the only
@@ -290,7 +474,7 @@
 +		console.info("WOSA: closeApp (standalone) calling window.close()");
 +		try { window.close(); } catch (e) { console.info("WOSA close err: " + e); }
 +		console.info("WOSA: closeApp window.close() call returned");
- 	},
++	},
 +
 +	// webOS Archive: shared by the Done button and both cards' "Skip Account
 +	// Setup" link. Shows the restart warning for a moment so the UI doesn't just
@@ -303,14 +487,15 @@
 +			this.closeApp();
 +		}), 900);
 +	},
-+
+ 
+-		this.$.postLoginSettings.call();
+-		this.$.removeRestoreFailedFile.call();
 +	wosaSkipSetup: function(){
 +		this.wosaSafeClose();
-+	},
+ 	},
  	
  	postTimeZoneResponse: function(inSender, inResponse){
-         console.info("postTimeZoneResponse Call Returned");
-@@ -893,16 +1069,10 @@
+@@ -893,16 +978,10 @@
  	},
  	
  	firstUseComplete: function() {
@@ -331,7 +516,7 @@
  	},
  	
  	performSoftwareUpdate: function() {
-@@ -921,16 +1091,8 @@
+@@ -921,16 +1000,8 @@
  	
      
      powerDownDevice: function () {
@@ -350,7 +535,7 @@
  	},
  	
  	powerDownResponse:function(inSender, inResponse){
-@@ -1029,8 +1191,9 @@
+@@ -1029,8 +1100,9 @@
  		if(inResponse.returnValue){
  			this.setAcctAlias(inResponse.accountAlias);
  			this.setAcctToken(inResponse.token);

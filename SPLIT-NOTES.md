@@ -186,8 +186,15 @@ went and is worth avoiding next time — see the ipk/postinst-style approach
 instead).
 
 **Open items, not yet acted on:**
-- `FirstUse.js`'s WiFiPopup-cancel path to the same wifi-delete behavior
-  (Bug 2, second path) — reachability in this app unconfirmed.
+- ~~`FirstUse.js`'s WiFiPopup-cancel path to the same wifi-delete behavior
+  (Bug 2, second path) — reachability in this app unconfirmed.~~ Gone in 1.2.1
+  (2026-11-26): the app no longer carries First Use's Wi-Fi popup, its cancel
+  dialog or the captive-portal reset at all. That popup was created when the app
+  opened and scanned for networks every 12 seconds while it stayed open, whether
+  or not it was shown; on Lunacy, which has no network scan, every scan raised
+  "Error: Cannot Load Network List". When the connection is lost the app now
+  shows "No Internet Connection" with a button to the system's Wi-Fi settings
+  (com.palm.app.wifi), and closes it when the connection comes back.
 - Self-update (`Updater-Helper.js`) path from an old buggy version to a fixed
   one is untested — only fresh Preware installs were exercised.
 - `prerm`/uninstall itself was never actually run this session, only reasoned

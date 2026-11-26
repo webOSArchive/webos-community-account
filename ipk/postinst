@@ -26,7 +26,7 @@ if [ ! -d "$STAGE/app" ]; then
     exit 1
 fi
 
-# 0) Only HP webOS 3.0.5 and webOS CE 3.1 or later (TouchPad-only). The patched
+# 0) Only HP webOS 3.0.5, webOS CE 3.1 or later (TouchPad-only), and Lunacy. The patched
 # service files and service-stock/ come from 3.0.5, so on an older build (a 1.x/2.x
 # phone, 3.0.0-3.0.4) neither the patch nor prerm's restore would be right. There
 # is deliberately no upper bound: CE 3.2 and later keep this service, and the file
@@ -39,6 +39,12 @@ fi
 # backups, and prerm leaves the service patched and only removes the app.
 OSINFO=`grep PRODUCT_VERSION_STRING /etc/palm-build-info 2>/dev/null | head -n 1`
 OSVER=`echo "$OSINFO" | sed -e 's/.*[^0-9.]\([0-9][0-9]*\.[0-9][0-9.]*\).*/\1/'`
+# Lunacy (webOS apps on Android) names itself in palm-build-info and never claims
+# a webOS version, but its palmprofile service is HP's 3.0.5 original, so it is
+# patched, backed up and restored as on 3.0.5.
+case "$OSINFO" in
+    *=Lunacy\ *) OSVER=3.0.5 ;;
+esac
 case "$OSVER" in
     3.0.5) ;;
     [12].*|3.0.*) OSVER=old ;;

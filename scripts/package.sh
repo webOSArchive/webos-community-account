@@ -20,7 +20,17 @@
 # the payload stages and nothing activates.
 #
 # Usage: deploy.sh first (and ideally verify sign-in), then: scripts/package.sh
+#
+# Or without a device: scripts/package.sh --rootfs <stock rootfs .tar.gz>
+# builds the same app and service files on the host, as deploy.sh does on a
+# device, from HP's stock webOS 3.0.5 rootfs (nova-cust-image-topaz.rootfs.tar.gz,
+# out of the Doctor), which is what the patches are written against.
 set -e
+ROOTFS=
+if [ "$1" = --rootfs ]; then
+    ROOTFS=$(cd "$(dirname "$2")" && pwd)/$(basename "$2")
+    [ -f "$ROOTFS" ] || { echo "!! no rootfs at $2" >&2; exit 1; }
+fi
 HERE="$(cd "$(dirname "$0")/.." && pwd)"      # webos/
 PKG=org.webosarchive.webosaccount
 VERSION=$(sed -n 's/.*"version": *"\([^"]*\)".*/\1/p' "$HERE/app/appinfo.json" | head -1)
@@ -33,6 +43,44 @@ STAGE_REL=usr/palm/webosarchive/webosaccount   # under /media/cryptofs/apps on d
 rm -rf "$BUILD"
 mkdir -p "$BUILD/data/$STAGE_REL/service"
 
+# build_on_host: deploy.sh's steps 1, 1b and 2, done to files from the stock rootfs
+# instead of to a device, into the same places the device pull below fills.
+build_on_host() {
+    ST="$BUILD/stock"; mkdir -p "$ST"
+    tar xzf "$ROOTFS" -C "$ST" ./usr/palm/applications/com.palm.app.firstuse .$SVC
+    A="$BUILD/data/$STAGE_REL/app"; S="$BUILD/data/$STAGE_REL/service"; P="$HERE/patches"
+    echo ">> 1) build app on host: clone stock firstuse -> $APPID"
+    cp -R "$ST/usr/palm/applications/com.palm.app.firstuse" "$A"
+    rm -rf "$A/scripts"
+    patch -s -f "$A/FirstUse.js" "$P/FirstUse.js.patch"
+    patch -s -f "$A/source/signin/Signin.js" "$P/Signin.js.patch"
+    patch -s -f "$A/source/tnc/Palm.js" "$P/Palm.js.patch"
+    patch -s -f "$A/css/Firstuse.css" "$P/Firstuse.css.patch"
+    cp "$HERE/app/appinfo.json" "$HERE/app/config.js" "$HERE/app/Updater-Helper.js" "$A/"
+    patch -s -f "$A/depends.js" "$P/depends.js.patch"
+    find "$A/resources" -name appinfo.json | while read -r f; do
+        sed -e "s/com\.palm\.app\.firstuse/$APPID/g; s/HP webOS/webOS Account/g; s/\"visible\": false/\"visible\": true/g; s/\"visible\": true/\"visible\": true, \"removable\": false/g; s/\"vendor\": \"HP\"/\"vendor\": \"webOS Archive\"/g; s/\"version\": \"[^\"]*\"/\"version\": \"$VERSION\"/g" "$f" > "$f.new"
+        mv "$f.new" "$f"
+    done
+    find "$A" -name '*.orig' -delete
+    echo ">> 2) patch palmprofile service files on host"
+    for f in utils/palm_profile_util.js handlers/LoginProfileCommandAssistant.js handlers/IsEmailAvailableCommandAssistant.js \
+             handlers/GetTermsAndConditionsCommandAssistant.js handlers/GetTokenCommandAssistant.js \
+             handlers/GetAccountInfoAggregateAssistant.js services.json sources.json; do
+        n=$(basename "$f")
+        cp "$ST/$SVC/$f" "$S/$n"
+        patch -s -f "$S/$n" "$P/$n.patch"
+    done
+    rm -f "$S"/*.orig
+    for a in UpdateUsernameCommandAssistant SyncDeviceNameCommandAssistant SignOutCommandAssistant; do
+        cp "$HERE/service/$a.js" "$S/"
+    done
+    rm -rf "$ST"
+}
+
+if [ -n "$ROOTFS" ]; then
+build_on_host
+else
 echo ">> 1) pull built app from device"
 novacom run file:///bin/tar -- czf - -C /usr/palm/applications "$APPID" > "$BUILD/app.tgz"
 mkdir -p "$BUILD/apptmp"
@@ -57,6 +105,8 @@ novacom run file:///bin/cat -- "$SVC/handlers/SyncDeviceNameCommandAssistant.js"
 novacom run file:///bin/cat -- "$SVC/handlers/SignOutCommandAssistant.js"         > "$BUILD/data/$STAGE_REL/service/SignOutCommandAssistant.js"
 novacom run file:///bin/cat -- "$SVC/services.json"                                > "$BUILD/data/$STAGE_REL/service/services.json"
 novacom run file:///bin/cat -- "$SVC/sources.json"                                 > "$BUILD/data/$STAGE_REL/service/sources.json"
+
+fi
 
 echo ">> 2b) stage genuine HP stock ($HERE/service-stock) for postinst to seed .stock from"
 # Not pulled from the device — the device's copy is already patched. postinst
@@ -122,8 +172,10 @@ chmod 755 "$BUILD/control/postinst" "$BUILD/control/prerm"
 printf '2.0\n' > "$BUILD/debian-binary"
 # BusyBox/ipkg-friendly tarballs: ustar format, root ownership, no macOS xattr
 # turds, and the "./" member prefix ipkg's extractor REQUIRES (rc 22 without it)
-( cd "$BUILD/control" && COPYFILE_DISABLE=1 tar --format ustar --uid 0 --gid 0 --numeric-owner -czf ../control.tar.gz ./control ./postinst ./prerm )
-( cd "$BUILD/data"    && COPYFILE_DISABLE=1 tar --format ustar --uid 0 --gid 0 --numeric-owner -czf ../data.tar.gz ./usr )
+# (bsdtar, a Mac's, spells root ownership --uid/--gid; GNU tar, Linux's, --owner/--group)
+if tar --version 2>/dev/null | grep -q "GNU tar"; then OWN="--owner=0 --group=0"; else OWN="--uid 0 --gid 0"; fi
+( cd "$BUILD/control" && COPYFILE_DISABLE=1 tar --format ustar $OWN --numeric-owner -czf ../control.tar.gz ./control ./postinst ./prerm )
+( cd "$BUILD/data"    && COPYFILE_DISABLE=1 tar --format ustar $OWN --numeric-owner -czf ../data.tar.gz ./usr )
 rm -f "$IPK"
 ( cd "$BUILD" && ar rc "$IPK" debian-binary control.tar.gz data.tar.gz )
 

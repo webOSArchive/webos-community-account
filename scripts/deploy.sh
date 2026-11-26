@@ -83,13 +83,10 @@ apply "$APPDIR/css/Firstuse.css"        "$PATCHES/Firstuse.css.patch"
 novacom put "file://$APPDIR/appinfo.json" < "$APP/appinfo.json"
 novacom put "file://$APPDIR/config.js"    < "$APP/config.js"
 # (icon: the clone keeps firstuse's own images/icon.png — we are "cloning", not re-skinning)
-# self-updater (vendored from webos-common), and our WiFiPopup subclass that
-# debounces the "No Internet" false alarm during OOBE (see the file for why) —
-# both new files stock firstuse doesn't have, so push them then patch them
-# into the enyo.depends list.
+# self-updater (vendored from webos-common), a new file stock firstuse doesn't
+# have, so push it then patch it into the enyo.depends list (which also drops
+# the Wi-Fi and captive-portal libraries: the app no longer joins networks).
 novacom put "file://$APPDIR/Updater-Helper.js" < "$APP/Updater-Helper.js"
-dev "mkdir -p $APPDIR/source/wifi"
-novacom put "file://$APPDIR/source/wifi/WOSAWiFiPopup.js" < "$APP/source/wifi/WOSAWiFiPopup.js"
 apply "$APPDIR/depends.js" "$PATCHES/depends.js.patch"
 # CRITICAL: localized resources/<locale>/appinfo.json each carry the id and OVERRIDE the base.
 # The id MUST start with com.palm. (webOS grants privileged calls by prefix) — set it everywhere.

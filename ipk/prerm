@@ -13,6 +13,12 @@ FILES="utils/palm_profile_util.js handlers/LoginProfileCommandAssistant.js handl
 # nothing, so there is nothing here to undo.
 OSINFO=`grep PRODUCT_VERSION_STRING /etc/palm-build-info 2>/dev/null | head -n 1`
 OSVER=`echo "$OSINFO" | sed -e 's/.*[^0-9.]\([0-9][0-9]*\.[0-9][0-9.]*\).*/\1/'`
+# Lunacy (webOS apps on Android) names itself in palm-build-info and never claims
+# a webOS version, but its palmprofile service is HP's 3.0.5 original, so it is
+# patched, backed up and restored as on 3.0.5.
+case "$OSINFO" in
+    *=Lunacy\ *) OSVER=3.0.5 ;;
+esac
 case "$OSVER" in
     3.0.5) ;;
     [12].*|3.0.*) OSVER=old ;;
