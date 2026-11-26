@@ -1,5 +1,5 @@
---- FirstUse.js.stock	2026-11-26 08:08:24.607169383 -0500
-+++ FirstUse.js.edited	2026-11-26 08:08:24.608169375 -0500
+--- FirstUse.js.s	2026-11-26 08:24:41.736821555 -0500
++++ FirstUse.js	2026-11-26 08:24:35.756170737 -0500
 @@ -34,9 +34,9 @@
  		languageCode: "",
  		serverURL: "",
@@ -34,7 +34,7 @@
  
  		{kind: "MyApps.FirstUse.SpinnerOverlayPopup", name: "spinnerOverlay"},
 +
-+		// webOS Archive: closing this app under OOBE (via Skip or the Done button)
++		// webOS Archive: closing this app under OOBE (via the Done button)
 +		// is what triggers the device reboot that finishes setup. No buttons — it's
 +		// just shown for a moment before wosaSafeClose closes the app out from
 +		// under it.
@@ -402,7 +402,7 @@
  	onSimCheckSuccess:function(){
  		console.log("onSimCheckSuccess");
  		this.$.MyCheckSim.close();
-@@ -828,19 +849,83 @@
+@@ -828,21 +849,82 @@
  	},
  	
  	done: function(){
@@ -432,6 +432,9 @@
  
 -		console.log("Set Customizations: " + this.countryCode + " : " + this.languageCode);
 -		this.$.setCustomization.call({"language":this.languageCode,"country":this.countryCode});
+-
+-		this.$.postLoginSettings.call();
+-		this.$.removeRestoreFailedFile.call();
 +	// webOS Archive: under OOBE, closing this app is what triggers the device
 +	// reboot that finishes setup — an 8-10s freeze with no window chrome to hint
 +	// anything is happening. Without a warning shown BEFORE that freeze starts, a
@@ -476,9 +479,10 @@
 +		console.info("WOSA: closeApp window.close() call returned");
 +	},
 +
-+	// webOS Archive: shared by the Done button and both cards' "Skip Account
-+	// Setup" link. Shows the restart warning for a moment so the UI doesn't just
-+	// freeze with no explanation, then closes.
++	// webOS Archive: the Done button's close. Shows the restart warning for a
++	// moment so the UI doesn't just freeze with no explanation, then closes.
++	// (The app is no longer First Use, so it has no "Skip Account Setup": a person
++	// who doesn't want an account closes it like any other app.)
 +	wosaSafeClose: function(){
 +		console.info("WOSA: wosaSafeClose opening restart popup");
 +		this.$.wosaSkipRestartPopup.openAtCenter();
@@ -486,16 +490,13 @@
 +			console.info("WOSA: wosaSafeClose timer fired");
 +			this.closeApp();
 +		}), 900);
-+	},
- 
--		this.$.postLoginSettings.call();
--		this.$.removeRestoreFailedFile.call();
-+	wosaSkipSetup: function(){
-+		this.wosaSafeClose();
  	},
- 	
+-	
++
  	postTimeZoneResponse: function(inSender, inResponse){
-@@ -893,16 +978,10 @@
+         console.info("postTimeZoneResponse Call Returned");
+ 		if (!inResponse.returnValue) {
+@@ -893,16 +975,10 @@
  	},
  	
  	firstUseComplete: function() {
@@ -516,7 +517,7 @@
  	},
  	
  	performSoftwareUpdate: function() {
-@@ -921,16 +1000,8 @@
+@@ -921,16 +997,8 @@
  	
      
      powerDownDevice: function () {
@@ -535,7 +536,7 @@
  	},
  	
  	powerDownResponse:function(inSender, inResponse){
-@@ -1029,8 +1100,9 @@
+@@ -1029,8 +1097,9 @@
  		if(inResponse.returnValue){
  			this.setAcctAlias(inResponse.accountAlias);
  			this.setAcctToken(inResponse.token);

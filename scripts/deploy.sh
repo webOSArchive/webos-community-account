@@ -79,7 +79,6 @@ dev "rm -rf $APPDIR && cp -r $FU $APPDIR && rm -rf $APPDIR/scripts && echo clone
 apply "$APPDIR/FirstUse.js"             "$PATCHES/FirstUse.js.patch"
 apply "$APPDIR/source/signin/Signin.js" "$PATCHES/Signin.js.patch"
 apply "$APPDIR/source/tnc/Palm.js"      "$PATCHES/Palm.js.patch"
-apply "$APPDIR/css/Firstuse.css"        "$PATCHES/Firstuse.css.patch"
 novacom put "file://$APPDIR/appinfo.json" < "$APP/appinfo.json"
 novacom put "file://$APPDIR/config.js"    < "$APP/config.js"
 # (icon: the clone keeps firstuse's own images/icon.png — we are "cloning", not re-skinning)

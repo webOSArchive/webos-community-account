@@ -55,7 +55,6 @@ build_on_host() {
     patch -s -f "$A/FirstUse.js" "$P/FirstUse.js.patch"
     patch -s -f "$A/source/signin/Signin.js" "$P/Signin.js.patch"
     patch -s -f "$A/source/tnc/Palm.js" "$P/Palm.js.patch"
-    patch -s -f "$A/css/Firstuse.css" "$P/Firstuse.css.patch"
     cp "$HERE/app/appinfo.json" "$HERE/app/config.js" "$HERE/app/Updater-Helper.js" "$A/"
     patch -s -f "$A/depends.js" "$P/depends.js.patch"
     find "$A/resources" -name appinfo.json | while read -r f; do

@@ -36,9 +36,8 @@ webos/
 │   │                                        # wrong-password/-email copy instead of a fallback
 │   │                                        # that reads like a server outage; syncDeviceName
 │   │                                        # call before finishing
-│   ├── Palm.js.patch                        # app: terms card -> our TOS endpoint (skip dead LCN lookup);
-│   │                                        # "Skip Account Setup" link (setup is optional under OOBE too)
-│   ├── Firstuse.css.patch                   # app: position the Skip link beside Start Over (was overlapping)
+│   ├── Palm.js.patch                        # app: terms card -> our TOS endpoint (skip dead LCN lookup)
+│   ├── depends.js.patch                     # app: load Updater-Helper.js; drop the Wi-Fi and captive-portal libraries
 │                                            # (the Accounts settings APP is not patched here — see below)
 ├── service/
 │   ├── UpdateUsernameCommandAssistant.js    # ours, not HP's: palm://com.palm.accountservices/updateUsername
